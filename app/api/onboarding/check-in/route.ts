@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
-import { createClient } from "@/lib/supabase/server"
+import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
+import { authOptions } from "@/lib/auth"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 const metadataSchema = z
   .object({
@@ -57,17 +59,14 @@ export async function POST(request: NextRequest) {
 
     const payload = payloadSchema.parse(await request.json())
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const session = await getServerSession(authOptions)
 
-    if (userError || !user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const userId = user.id
+    const userId = session.user.id
+    const supabase = createAdminClient()
 
     const filteredResponses = payload.responses.filter((response) => response.response.trim().length > 0)
 

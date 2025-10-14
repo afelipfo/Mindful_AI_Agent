@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
+import { authOptions } from "@/lib/auth"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type { WellnessSnapshot } from "@/types/wellness"
 
 export async function GET(request: NextRequest) {
@@ -11,17 +13,14 @@ export async function GET(request: NextRequest) {
       return rateLimitResult
     }
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const session = await getServerSession(authOptions)
 
-    if (userError || !user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const userId = user.id
+    const userId = session.user.id
+    const supabase = createAdminClient()
 
     const [{ data: moodEntriesData }, { data: wellnessGoalsData }, { data: insightsData }] = await Promise.all([
       supabase
