@@ -5,6 +5,7 @@ import { Brain, Heart, Zap, TrendingUp, Mic, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
+import { QuickMoodAnalyzer } from "@/components/check-in/quick-mood-analyzer"
 
 export default function LandingPage() {
   return (
@@ -13,23 +14,26 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 md:px-6 md:py-24">
-        <div className="mx-auto max-w-4xl text-center">
-          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 animate-fade-in">
-            <Brain className="h-8 w-8 text-primary" />
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+          <div className="mx-auto max-w-xl text-center lg:text-left">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 animate-fade-in">
+              <Brain className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl animate-fade-in [animation-delay:100ms]">
+              Your AI-Powered Mental Wellness Companion
+            </h1>
+            <p className="mb-8 text-pretty text-lg text-text-secondary md:text-xl animate-fade-in [animation-delay:200ms]">
+              Track your emotional states through multimodal inputs and receive personalized insights to improve your
+              mental wellbeing.
+            </p>
+            <div className="flex flex-col items-center justify-center gap-4 animate-fade-in [animation-delay:300ms] lg:items-start lg:justify-start">
+              <Button asChild size="lg" className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
+                <Link href="/onboarding">Start full onboarding</Link>
+              </Button>
+              <p className="text-sm text-text-muted">Prefer a faster check-in? Try the analyzer alongside.</p>
+            </div>
           </div>
-          <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl animate-fade-in [animation-delay:100ms]">
-            Your AI-Powered Mental Wellness Companion
-          </h1>
-          <p className="mb-8 text-pretty text-lg text-text-secondary md:text-xl animate-fade-in [animation-delay:200ms]">
-            Track your emotional states through multimodal inputs and receive personalized insights to improve your
-            mental wellbeing.
-          </p>
-          <div className="flex flex-col items-center justify-center gap-4 animate-fade-in [animation-delay:300ms]">
-            <Button asChild size="lg" className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
-              <Link href="/onboarding">Get Started</Link>
-            </Button>
-            <p className="text-sm text-text-muted">Start your wellness journey in just 6 steps</p>
-          </div>
+          <QuickMoodAnalyzer className="animate-fade-in [animation-delay:300ms]" />
         </div>
       </section>
 

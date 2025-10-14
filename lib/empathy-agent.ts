@@ -12,7 +12,13 @@ interface EmpathyInput {
   longitude?: number
 }
 
-interface EmpathyResponse {
+interface AnalysisSource {
+  type: "text" | "emoji" | "voice" | "photo" | "history"
+  label: string
+  weight: number
+}
+
+interface RecommendationSet {
   empathyMessage: string
   recommendation: {
     title: string
@@ -44,6 +50,13 @@ interface EmpathyResponse {
     benefits: string
     address?: string
   }
+}
+
+export interface EmpathyResponse extends RecommendationSet {
+  detectedMood: MoodCategory
+  confidence: number
+  analysisSummary: string
+  analysisSources: AnalysisSource[]
 }
 
 // Detect mood category from emotions and score
@@ -95,8 +108,163 @@ export function detectMoodCategory(emotions: string[], moodScore: number): MoodC
   return "anxious"
 }
 
+const textMoodKeywords: Record<MoodCategory, string[]> = {
+  anxious: ["anxious", "worried", "nervous", "uneasy", "on edge", "overwhelmed", "panic"],
+  happy: ["happy", "grateful", "calm", "content", "peaceful", "good", "smiling"],
+  sad: ["sad", "down", "low", "blue", "lonely", "upset", "heartbroken"],
+  tired: ["tired", "exhausted", "fatigued", "drained", "sleepy", "worn out", "burned out"],
+  stressed: ["stressed", "pressure", "tense", "frustrated", "irritated", "rushed"],
+  excited: ["excited", "energized", "pumped", "thrilled", "motivated", "inspired"],
+}
+
+const moodBaseScore: Record<MoodCategory, number> = {
+  anxious: 3,
+  happy: 8,
+  sad: 3,
+  tired: 4,
+  stressed: 4,
+  excited: 8,
+}
+
+export function inferMoodFromText(text: string): { mood: MoodCategory; score: number; emotions: string[] } {
+  const normalized = text.toLowerCase()
+  let bestMood: MoodCategory = "tired"
+  let bestMatches = 0
+  const matchedEmotions = new Set<string>()
+
+  for (const mood of Object.keys(textMoodKeywords) as MoodCategory[]) {
+    const keywords = textMoodKeywords[mood]
+    let matches = 0
+    for (const keyword of keywords) {
+      if (normalized.includes(keyword)) {
+        matches += 1
+        matchedEmotions.add(keyword)
+      }
+    }
+    if (matches > bestMatches) {
+      bestMatches = matches
+      bestMood = mood
+    }
+  }
+
+  let score = moodBaseScore[bestMood]
+
+  if (normalized.includes("very") || normalized.includes("really") || normalized.includes("extremely")) {
+    score += 1
+  }
+  if (normalized.includes("slightly") || normalized.includes("kind of") || normalized.includes("a little")) {
+    score -= 1
+  }
+
+  score = Math.min(10, Math.max(2, score))
+
+  return {
+    mood: bestMood,
+    score,
+    emotions: Array.from(matchedEmotions).slice(0, 5),
+  }
+}
+
+const moodDescriptors: Record<MoodCategory, string> = {
+  anxious: "Signals suggest your nervous system is running high, pointing toward an anxious state.",
+  happy: "Your tone and word choices lean warm and appreciative, suggesting a happy mood.",
+  sad: "There are cues of heaviness and inward focus, consistent with a sad or reflective mood.",
+  tired: "Recurring mentions of fatigue and slowed momentum hint at mental or physical tiredness.",
+  stressed: "Mentions of pressure and tight timelines align with a stressed emotional profile.",
+  excited: "Elevated language and momentum signal an excited, forward-looking energy.",
+}
+
+function truncate(text: string, maxLength: number): string {
+  const normalized = text.replace(/\s+/g, " ").trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+  return `${normalized.slice(0, maxLength - 3)}...`
+}
+
+function calculateConfidence(input: EmpathyInput): number {
+  let confidence = 60
+
+  if (typeof input.moodScore === "number" && !Number.isNaN(input.moodScore)) {
+    confidence += Math.min(15, Math.abs(input.moodScore - 5) * 3)
+  }
+  if (input.context && input.context.length > 80) {
+    confidence += 10
+  }
+  if (input.emotions.length > 0) {
+    confidence += 5
+  }
+  if (typeof input.energyLevel === "number" && input.energyLevel !== 5) {
+    confidence += 5
+  }
+
+  return Math.max(45, Math.min(95, Math.round(confidence)))
+}
+
+function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, confidence: number): string {
+  const descriptor = moodDescriptors[mood]
+  const parts: string[] = [descriptor]
+
+  if (input.context) {
+    parts.push(`Recent note: "${truncate(input.context, 120)}".`)
+  }
+
+  if (input.emotions.length > 0) {
+    parts.push(`Emotions mentioned: ${input.emotions.slice(0, 3).join(", ")}.`)
+  }
+
+  if (typeof input.energyLevel === "number") {
+    parts.push(`Energy around ${input.energyLevel}/10.`)
+  }
+
+  parts.push(`Confidence ~${confidence}%.`)
+
+  return parts.join(" ")
+}
+
+function normalizeSources(sources: AnalysisSource[]): AnalysisSource[] {
+  if (sources.length === 0) {
+    return [
+      {
+        type: "text",
+        label: "Baseline wellness model",
+        weight: 100,
+      },
+    ]
+  }
+
+  const total = sources.reduce((sum, source) => sum + source.weight, 0)
+
+  return sources.map((source) => ({
+    ...source,
+    weight: Math.round((source.weight / total) * 100),
+  }))
+}
+
+function buildAnalysisSources(input: EmpathyInput): AnalysisSource[] {
+  const sources: AnalysisSource[] = []
+
+  if (input.context) {
+    sources.push({ type: "text", label: "Text reflection", weight: 0.6 })
+  }
+
+  if (input.emotions.length > 0) {
+    sources.push({ type: "emoji", label: "Mood tags", weight: 0.2 })
+  }
+
+  if (typeof input.moodScore === "number") {
+    sources.push({ type: "history", label: "Mood score", weight: 0.15 })
+  }
+
+  if (typeof input.energyLevel === "number") {
+    sources.push({ type: "history", label: "Energy level", weight: 0.1 })
+  }
+
+  return normalizeSources(sources)
+}
+
 // Pre-cached responses for each mood category
-const empathyResponses: Record<MoodCategory, EmpathyResponse> = {
+const empathyResponses: Record<MoodCategory, RecommendationSet> = {
   anxious: {
     empathyMessage:
       "It's completely normal to feel anxious. Your feelings are valid, and you're taking the right step by acknowledging them. Remember, anxiety is your mind trying to protect you.",
@@ -307,15 +475,9 @@ function ensureValidMood(mood: string): MoodCategory {
   return "tired"
 }
 
-async function generatePersonalizedEmpathy(input: EmpathyInput): Promise<{
-  empathyMessage: string
-  recommendation: {
-    title: string
-    description: string
-    actionLabel: string
-    actionType: "breathing" | "journal" | "timer" | "contact"
-  }
-}> {
+async function generatePersonalizedEmpathy(
+  input: EmpathyInput,
+): Promise<Pick<RecommendationSet, "empathyMessage" | "recommendation">> {
   try {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OpenAI API key not configured")
@@ -362,9 +524,10 @@ async function generatePersonalizedEmpathy(input: EmpathyInput): Promise<{
     return result
   } catch (error) {
     console.error("[v0] OpenAI empathy generation error:", error)
+    const fallback = empathyResponses[input.detectedMood]
     return {
-      empathyMessage: empathyResponses[input.detectedMood].empathyMessage,
-      recommendation: empathyResponses[input.detectedMood].recommendation,
+      empathyMessage: fallback.empathyMessage,
+      recommendation: fallback.recommendation,
     }
   }
 }
@@ -610,16 +773,28 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
 }
 
 export async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
+  const validMood = ensureValidMood(input.detectedMood)
+  const trimmedContext = input.context ? input.context.slice(-600) : undefined
+  const normalizedInput: EmpathyInput = {
+    ...input,
+    detectedMood: validMood,
+    context: trimmedContext,
+    emotions: input.emotions,
+  }
+
+  const confidence = calculateConfidence(normalizedInput)
+  const analysisSummary = buildAnalysisSummary(normalizedInput, validMood, confidence)
+  const analysisSources = buildAnalysisSources(normalizedInput)
+
   try {
-    const validMood = ensureValidMood(input.detectedMood)
     console.log("[v0] Generating empathy recommendations for mood:", validMood)
 
     const results = await Promise.allSettled([
-      generatePersonalizedEmpathy({ ...input, detectedMood: validMood }),
+      generatePersonalizedEmpathy(normalizedInput),
       getMusicRecommendation(validMood),
       getBookRecommendation(validMood),
       getQuoteRecommendation(validMood),
-      getPlaceRecommendation(validMood, input.latitude, input.longitude),
+      getPlaceRecommendation(validMood, normalizedInput.latitude, normalizedInput.longitude),
     ])
 
     console.log(
@@ -648,6 +823,10 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
       results[4].status === "fulfilled" && results[4].value ? results[4].value : empathyResponses[validMood].place
 
     const response: EmpathyResponse = {
+      detectedMood: validMood,
+      confidence,
+      analysisSummary,
+      analysisSources,
       empathyMessage: empathyData.empathyMessage || empathyResponses[validMood].empathyMessage,
       recommendation: empathyData.recommendation || empathyResponses[validMood].recommendation,
       quote: quote || empathyResponses[validMood].quote,
@@ -660,7 +839,12 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
     return response
   } catch (error) {
     console.error("[v0] Error generating empathy recommendations:", error)
-    const validMood = ensureValidMood(input.detectedMood)
-    return empathyResponses[validMood]
+    return {
+      detectedMood: validMood,
+      confidence,
+      analysisSummary,
+      analysisSources,
+      ...empathyResponses[validMood],
+    }
   }
 }

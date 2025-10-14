@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { ProgressSidebar } from "@/components/onboarding/progress-sidebar"
 import { ConversationInterface } from "@/components/onboarding/conversation-interface"
@@ -12,9 +11,11 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
-import { moodEntries, triggerFrequency, copingEffectiveness, wellnessGoals, aiInsights } from "@/lib/sample-data"
+import { getDemoWellnessSnapshot } from "@/lib/wellness-data"
 import { format } from "date-fns"
 import { Progress } from "@/components/ui/progress"
+import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
+import type { EmpathyResponse } from "@/lib/empathy-agent"
 
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamic(
@@ -51,14 +52,6 @@ const InsightCard = dynamic(
   () => import("@/components/insights/insight-card").then(mod => ({ default: mod.InsightCard })),
   { ssr: false }
 )
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  type?: "text" | "voice" | "emoji" | "photo"
-  metadata?: any
-}
 
 interface Step {
   id: number
@@ -109,12 +102,10 @@ const stepTitles = [
 ]
 
 export default function OnboardingPage() {
-  const router = useRouter()
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [showEmpathy, setShowEmpathy] = useState(false)
-  const [empathyData, setEmpathyData] = useState<any>(null)
+  const [empathyData, setEmpathyData] = useState<EmpathyResponse | null>(null)
   const [isCompleted, setIsCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState("empathy")
   const [steps, setSteps] = useState<Step[]>(
@@ -125,7 +116,16 @@ export default function OnboardingPage() {
     })),
   )
 
-  const recentEntries = moodEntries.slice(0, 7)
+  const wellnessSnapshot = useMemo(() => getDemoWellnessSnapshot(), [])
+  const {
+    moodEntries: demoMoodEntries,
+    triggerFrequency: demoTriggerFrequency,
+    copingEffectiveness: demoCopingEffectiveness,
+    wellnessGoals: demoWellnessGoals,
+    aiInsights: demoAiInsights,
+  } = wellnessSnapshot
+
+  const recentEntries = demoMoodEntries.slice(0, 7)
   const avgMood = (recentEntries.reduce((sum, entry) => sum + entry.mood, 0) / recentEntries.length).toFixed(1)
   const avgEnergy = (recentEntries.reduce((sum, entry) => sum + entry.energy, 0) / recentEntries.length).toFixed(1)
   const wellbeingScore = 75
@@ -154,9 +154,9 @@ export default function OnboardingPage() {
     { day: "Sun", hour: 20, energy: 7 },
   ]
 
-  const patterns = aiInsights.filter((i) => i.type === "pattern")
-  const recommendations = aiInsights.filter((i) => i.type === "recommendation")
-  const alerts = aiInsights.filter((i) => i.type === "alert")
+  const patterns = demoAiInsights.filter((i) => i.type === "pattern")
+  const recommendations = demoAiInsights.filter((i) => i.type === "recommendation")
+  const alerts = demoAiInsights.filter((i) => i.type === "alert")
 
   useEffect(() => {
     setMessages([
@@ -168,14 +168,15 @@ export default function OnboardingPage() {
     ])
   }, [])
 
-  const handleSendMessage = (message: string, type?: "text" | "voice" | "emoji" | "photo", metadata?: any) => {
-    const userMessage: Message = {
+  const handleSendMessage = (message: string, type?: MessageType, metadata?: MessageMetadata) => {
+    const userMessage: ConversationMessage = {
       id: Date.now().toString(),
       role: "user",
       content: message,
       type,
       metadata,
     }
+    const updatedConversation = [...messages, userMessage]
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
 
@@ -198,7 +199,7 @@ export default function OnboardingPage() {
         )
         setCurrentStepIndex(nextStepIndex)
       } else {
-        const completionMessage: Message = {
+        const completionMessage: ConversationMessage = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content:
@@ -208,29 +209,70 @@ export default function OnboardingPage() {
 
         setSteps((prev) => prev.map((step) => ({ ...step, status: "completed" })))
 
-        fetchEmpathyRecommendations(message, metadata)
+        fetchEmpathyRecommendations(updatedConversation, metadata)
       }
       setIsLoading(false)
     }, 1500)
   }
 
-  const fetchEmpathyRecommendations = async (lastMessage: string, metadata?: any) => {
+  const fetchEmpathyRecommendations = async (
+    conversation: ConversationMessage[],
+    latestMetadata?: MessageMetadata,
+  ) => {
     try {
+      const userMessages = conversation.filter((msg) => msg.role === "user")
+      const textualNarrative = userMessages
+        .filter((msg) => msg.type !== "emoji")
+        .map((msg) => msg.content)
+        .join("\n")
+      const trimmedNarrative = textualNarrative.slice(-1000)
+      const emojiMessages = userMessages.filter(
+        (msg) => msg.type === "emoji" && msg.metadata && typeof msg.metadata.label === "string",
+      )
+
+      const emotionLabels = emojiMessages
+        .map((msg) => msg.metadata?.label as string | undefined)
+        .filter((label): label is string => Boolean(label))
+
+      const moodValues = emojiMessages
+        .map((msg) => (typeof msg.metadata?.value === "number" ? msg.metadata.value : null))
+        .filter((value): value is number => value !== null)
+
+      const payload: Record<string, unknown> = {
+        context:
+          trimmedNarrative ||
+          conversation[conversation.length - 1]?.content ||
+          (emotionLabels.length ? `Recent mood tags: ${emotionLabels.join(", ")}` : ""),
+        emotions: emotionLabels.map((label) => label.toLowerCase()),
+        triggers: [],
+        recentMoods: moodValues,
+      }
+
+      const moodLabel =
+        (typeof latestMetadata?.label === "string" && latestMetadata.label) ||
+        emotionLabels[emotionLabels.length - 1]
+
+      if (moodLabel) {
+        payload.mood = moodLabel
+      }
+
+      if (typeof latestMetadata?.value === "number") {
+        payload.moodScore = latestMetadata.value
+      }
+
+      if (typeof latestMetadata?.energy === "number") {
+        payload.energyLevel = latestMetadata.energy
+      }
+
       const response = await fetch("/api/empathy-recommendations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mood: metadata?.label || "neutral",
-          context: lastMessage,
-          triggers: [],
-          recentMoods: [],
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
         const data = await response.json()
         setEmpathyData(data)
-        setShowEmpathy(true)
         setIsCompleted(true)
       }
     } catch (error) {
@@ -316,7 +358,7 @@ export default function OnboardingPage() {
                     />
                     <MetricCard
                       title="Check-Ins"
-                      value={moodEntries.length}
+                      value={demoMoodEntries.length}
                       icon={<Brain className="h-5 w-5" />}
                       trend={{ direction: "up", value: "+3", isPositive: true }}
                     />
@@ -332,7 +374,7 @@ export default function OnboardingPage() {
                     <Card className="lg:col-span-2 p-6">
                       <h2 className="text-lg font-semibold mb-4">Mood & Energy Trends</h2>
                       <p className="text-sm text-text-secondary mb-4">Last 30 days</p>
-                      <MoodTrendChart data={moodEntries} />
+                      <MoodTrendChart data={demoMoodEntries} />
                     </Card>
 
                     <Card className="p-6">
@@ -345,7 +387,7 @@ export default function OnboardingPage() {
                     <Card className="p-6">
                       <h2 className="text-lg font-semibold mb-4">Common Triggers</h2>
                       <p className="text-sm text-text-secondary mb-4">Most frequent patterns affecting your mood</p>
-                      <TriggerCloud triggers={triggerFrequency} />
+                      <TriggerCloud triggers={demoTriggerFrequency} />
                     </Card>
 
                     <Card className="p-6">
@@ -358,7 +400,7 @@ export default function OnboardingPage() {
                   <Card className="p-6 mb-8">
                     <h2 className="text-lg font-semibold mb-4">Wellness Goals</h2>
                     <div className="space-y-6">
-                      {wellnessGoals.map((goal) => (
+                      {demoWellnessGoals.map((goal) => (
                         <div key={goal.goal}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium">{goal.goal}</span>
@@ -378,7 +420,7 @@ export default function OnboardingPage() {
                       Average mood improvement after using each strategy
                     </p>
                     <div className="space-y-3">
-                      {Object.entries(copingEffectiveness)
+                      {Object.entries(demoCopingEffectiveness)
                         .sort(([, a], [, b]) => b - a)
                         .map(([strategy, effectiveness]) => (
                           <div key={strategy} className="flex items-center justify-between">
@@ -448,7 +490,7 @@ export default function OnboardingPage() {
                       <TabsTrigger value="all">
                         All Insights
                         <Badge variant="secondary" className="ml-2">
-                          {aiInsights.length}
+                          {demoAiInsights.length}
                         </Badge>
                       </TabsTrigger>
                       <TabsTrigger value="patterns">
@@ -472,7 +514,7 @@ export default function OnboardingPage() {
                     </TabsList>
 
                     <TabsContent value="all" className="space-y-4">
-                      {aiInsights.map((insight, index) => (
+                      {demoAiInsights.map((insight, index) => (
                         <InsightCard key={index} insight={insight} />
                       ))}
                     </TabsContent>

@@ -1,5 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateEmpathyRecommendations, detectMoodCategory } from "@/lib/empathy-agent"
+import {
+  generateEmpathyRecommendations,
+  detectMoodCategory,
+  inferMoodFromText,
+  type MoodCategory,
+} from "@/lib/empathy-agent"
 import { empathyRecommendationSchema } from "@/lib/validations/empathy"
 import { ZodError } from "zod"
 import { withRateLimit } from "@/lib/api-middleware"
@@ -16,34 +21,48 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     const validatedData = empathyRecommendationSchema.parse(body)
-    const { mood, context, moodScore, emotions, energyLevel } = validatedData
+    const { mood, context, moodScore, emotions, energyLevel, recentMoods } = validatedData
 
-    let detectedMood: string
-    let score: number
-    let emotionsList: string[]
+    let detectedMood: string | undefined = typeof mood === "string" ? mood : undefined
+    let score: number | undefined = typeof moodScore === "number" ? moodScore : undefined
+    let emotionsList: string[] = Array.isArray(emotions) ? emotions.map((e) => e.toLowerCase()) : []
 
-    // Handle different input formats
-    if (mood && typeof mood === "string") {
-      // Simple mood string from onboarding
-      detectedMood = mood
-      score = 5 // Default neutral score
-      emotionsList = [mood]
-    } else if (typeof moodScore === "number" && Array.isArray(emotions)) {
-      // Detailed format
-      detectedMood = detectMoodCategory(emotions, moodScore)
-      score = moodScore
-      emotionsList = emotions
-    } else {
-      return NextResponse.json({ error: "Invalid input format" }, { status: 400 })
+    if (!detectedMood) {
+      if (typeof score === "number" && emotionsList.length > 0) {
+        detectedMood = detectMoodCategory(emotionsList, score)
+      } else if (typeof context === "string" && context.trim().length > 0) {
+        const inference = inferMoodFromText(context)
+        detectedMood = inference.mood
+        score = score ?? inference.score
+        if (inference.emotions.length > 0) {
+          emotionsList = Array.from(new Set([...emotionsList, ...inference.emotions]))
+        }
+      }
     }
+
+    if (!detectedMood) {
+      return NextResponse.json({ error: "Unable to determine mood from input" }, { status: 400 })
+    }
+
+    if (typeof score !== "number") {
+      if (Array.isArray(recentMoods) && recentMoods.length > 0) {
+        const average = recentMoods.reduce((acc, value) => acc + value, 0) / recentMoods.length
+        score = Math.round(average)
+      } else {
+        score = 5
+      }
+    }
+
+    const sanitizedContext =
+      typeof context === "string" && context.length > 0 ? context.slice(-1000) : emotionsList.join(", ")
 
     // Generate recommendations
     const recommendations = await generateEmpathyRecommendations({
       moodScore: score,
-      detectedMood: detectedMood as any,
+      detectedMood: detectedMood as MoodCategory,
       emotions: emotionsList,
       energyLevel: energyLevel || 5,
-      context,
+      context: sanitizedContext,
     })
 
     return NextResponse.json(recommendations)

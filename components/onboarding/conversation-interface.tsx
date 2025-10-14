@@ -15,22 +15,11 @@ import { PhotoCapture } from "@/components/check-in/photo-capture"
 import { cn } from "@/lib/utils"
 import { uploadAudio, uploadImage } from "@/lib/upload"
 import { useToast } from "@/hooks/use-toast"
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  type?: "text" | "voice" | "emoji" | "photo"
-  metadata?: {
-    emoji?: string
-    label?: string
-    note?: string
-  }
-}
+import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
 
 interface ConversationInterfaceProps {
-  messages: Message[]
-  onSendMessage: (message: string, type?: "text" | "voice" | "emoji" | "photo", metadata?: any) => void
+  messages: ConversationMessage[]
+  onSendMessage: (message: string, type?: MessageType, metadata?: MessageMetadata) => void
   placeholder?: string
   isLoading?: boolean
   enableMultimodal?: boolean
@@ -46,7 +35,7 @@ export function ConversationInterface({
   const [input, setInput] = useState("")
   const [activeTab, setActiveTab] = useState("text")
   const [textJournalValue, setTextJournalValue] = useState("")
-  const [isUploading, setIsUploading] = useState(false)
+  const [, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
