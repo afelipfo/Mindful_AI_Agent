@@ -23,14 +23,33 @@ async function transcribeAudio(url: string): Promise<string> {
     throw new Error("OpenAI API key not configured")
   }
 
-  const audioResponse = await fetch(url)
-  if (!audioResponse.ok) {
-    throw new Error("Failed to retrieve audio file")
+  let audioBuffer: ArrayBuffer
+
+  // Handle data URLs (for local development)
+  if (url.startsWith('data:')) {
+    const base64Data = url.split(',')[1]
+    const binaryString = atob(base64Data)
+    audioBuffer = new ArrayBuffer(binaryString.length)
+    const bytes = new Uint8Array(audioBuffer)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+  } else {
+    // Handle regular URLs
+    const audioResponse = await fetch(url)
+    if (!audioResponse.ok) {
+      throw new Error("Failed to retrieve audio file")
+    }
+    audioBuffer = await audioResponse.arrayBuffer()
   }
 
-  const arrayBuffer = await audioResponse.arrayBuffer()
-  const contentType = audioResponse.headers.get("content-type") ?? "audio/wav"
-  const blob = new Blob([arrayBuffer], { type: contentType })
+  // Determine content type
+  let contentType = "audio/wav"
+  if (url.startsWith('data:')) {
+    contentType = url.split(';')[0].split(':')[1]
+  }
+
+  const blob = new Blob([audioBuffer], { type: contentType })
   const file = new File([blob], "voice-note.wav", { type: contentType })
 
   const formData = new FormData()
