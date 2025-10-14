@@ -5,12 +5,12 @@ import { createClient } from '@supabase/supabase-js'
 
 // Create Supabase client if environment variables are available
 const createSupabaseClient = () => {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
     return null
   }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_ANON_KEY,
     {
       auth: {
         autoRefreshToken: false,
@@ -23,10 +23,10 @@ const createSupabaseClient = () => {
 const supabase = createSupabaseClient()
 
 export const authOptions: NextAuthOptions = {
-  adapter: (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  adapter: (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_ANON_KEY)
     ? SupabaseAdapter({
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        secret: process.env.SUPABASE_ANON_KEY,
       })
     : undefined,
   providers: [
@@ -45,20 +45,28 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Authentication not configured')
         }
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: credentials.email,
-          password: credentials.password,
-        })
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: credentials.email,
+            password: credentials.password,
+          })
 
-        if (error || !data.user) {
-          throw new Error(error?.message || 'Invalid credentials')
-        }
+          if (error || !data.user) {
+            console.error('Supabase auth error:', error)
+            throw new Error(error?.message || 'Invalid credentials')
+          }
 
-        return {
-          id: data.user.id,
-          email: data.user.email!,
-          name: data.user.user_metadata?.full_name,
-          image: data.user.user_metadata?.avatar_url,
+          console.log('Supabase auth successful for user:', data.user.email)
+
+          return {
+            id: data.user.id,
+            email: data.user.email!,
+            name: data.user.user_metadata?.full_name || data.user.email!.split('@')[0],
+            image: data.user.user_metadata?.avatar_url,
+          }
+        } catch (error) {
+          console.error('Credentials provider error:', error)
+          throw error
         }
       },
     }),
