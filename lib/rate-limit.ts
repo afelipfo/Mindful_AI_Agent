@@ -59,8 +59,8 @@ class InMemoryRateLimiter {
   private limit: number
   private windowMs: number
 
-  constructor(limit: number, windowMs: number) {
-    this.limit = limit
+  constructor(maxRequests: number, windowMs: number) {
+    this.limit = maxRequests
     this.windowMs = windowMs
   }
 
