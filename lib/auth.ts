@@ -1,7 +1,6 @@
 import { NextAuthOptions } from 'next-auth'
 import { SupabaseAdapter } from '@auth/supabase-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import GoogleProvider from 'next-auth/providers/google'
 import { createClient } from '@supabase/supabase-js'
 
 // Create Supabase client if environment variables are available
@@ -31,10 +30,6 @@ export const authOptions: NextAuthOptions = {
       })
     : undefined,
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
     CredentialsProvider({
       name: 'Email',
       credentials: {
