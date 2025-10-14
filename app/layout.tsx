@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Suspense } from "react"
 import { Toaster } from "@/components/ui/toaster"
+import { Providers } from "@/components/providers"
 
 export const metadata: Metadata = {
   title: "Mindful AI Agent - Your Mental Wellness Companion",
@@ -21,9 +22,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-        <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-        <Toaster />
-        <Analytics />
+        <Providers>
+          <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
+          <Toaster />
+          <Analytics />
+        </Providers>
       </body>
     </html>
   )

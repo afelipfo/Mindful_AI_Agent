@@ -20,9 +20,6 @@ import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/
 import type { EmpathyResponse } from "@/lib/empathy-agent"
 import type { WellnessSnapshot } from "@/lib/wellness-data"
 
-// Force dynamic rendering since we use useSession
-export const dynamic = 'force-dynamic'
-
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamicImport(
   () => import("@/components/check-in/empathy-recommendations").then(mod => ({ default: mod.EmpathyRecommendations })),
