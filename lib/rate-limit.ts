@@ -64,7 +64,7 @@ class InMemoryRateLimiter {
     this.windowMs = windowMs
   }
 
-  async limit(identifier: string) {
+  async checkLimit(identifier: string) {
     const now = Date.now()
     const windowStart = now - this.windowMs
 
@@ -118,7 +118,7 @@ export async function applyRateLimit(
       return { success: true, limit: 0, remaining: 0, reset: new Date() }
     }
 
-    return await limiter.limit(identifier)
+    return await limiter.checkLimit(identifier)
   } else {
     // In-memory fallback
     const limiter = type === 'ai'
@@ -129,6 +129,6 @@ export async function applyRateLimit(
       ? inMemoryAuthLimit
       : inMemoryGeneralLimit
 
-    return await limiter.limit(identifier)
+    return await limiter.checkLimit(identifier)
   }
 }
