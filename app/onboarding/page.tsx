@@ -400,30 +400,6 @@ export default function OnboardingPage() {
     }
   }, [status, loadSnapshot])
 
-  const energyHeatmapData = [
-    { day: "Mon", hour: 8, energy: 5 },
-    { day: "Mon", hour: 14, energy: 4 },
-    { day: "Mon", hour: 20, energy: 6 },
-    { day: "Tue", hour: 8, energy: 6 },
-    { day: "Tue", hour: 14, energy: 5 },
-    { day: "Tue", hour: 20, energy: 7 },
-    { day: "Wed", hour: 8, energy: 7 },
-    { day: "Wed", hour: 14, energy: 6 },
-    { day: "Wed", hour: 20, energy: 8 },
-    { day: "Thu", hour: 8, energy: 6 },
-    { day: "Thu", hour: 14, energy: 5 },
-    { day: "Thu", hour: 20, energy: 7 },
-    { day: "Fri", hour: 8, energy: 8 },
-    { day: "Fri", hour: 14, energy: 7 },
-    { day: "Fri", hour: 20, energy: 9 },
-    { day: "Sat", hour: 8, energy: 7 },
-    { day: "Sat", hour: 14, energy: 8 },
-    { day: "Sat", hour: 20, energy: 8 },
-    { day: "Sun", hour: 8, energy: 6 },
-    { day: "Sun", hour: 14, energy: 7 },
-    { day: "Sun", hour: 20, energy: 7 },
-  ]
-
   const patterns = aiInsights.filter((i) => i.type === "pattern")
   const recommendations = aiInsights.filter((i) => i.type === "recommendation")
   const alerts = aiInsights.filter((i) => i.type === "alert")
