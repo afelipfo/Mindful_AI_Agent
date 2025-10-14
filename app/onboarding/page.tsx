@@ -140,26 +140,32 @@ const ENERGY_BUCKETS = [
 
 const DAY_ABBREVIATIONS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
 
+type TrendData = {
+  direction: "up" | "down"
+  value: string
+  isPositive: boolean
+}
+
 const computeAverage = (entries: MoodEntry[], key: "mood" | "energy") => {
   if (!entries.length) return 0
   const total = entries.reduce((sum, entry) => sum + entry[key], 0)
   return total / entries.length
 }
 
-const buildTrend = (diff: number | null, decimals = 1) => {
+const buildTrend = (diff: number | null, decimals = 1): TrendData | undefined => {
   if (diff === null) return undefined
   if (!Number.isFinite(diff)) return undefined
   const rounded = Number(diff.toFixed(decimals))
   if (rounded === 0) {
     return {
-      direction: "up" as const,
-      value: "0",
+      direction: "up",
+      value: rounded.toFixed(decimals),
       isPositive: true,
     }
   }
   const isPositive = rounded > 0
   return {
-    direction: isPositive ? "up" : ("down" as const),
+    direction: isPositive ? "up" : "down",
     value: `${isPositive ? "+" : ""}${rounded.toFixed(decimals)}`,
     isPositive,
   }
