@@ -91,7 +91,6 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
       toast({
         title: "Unable to share",
         description: "We couldn't share this insight automatically. Try copying it manually.",
-        variant: "destructive",
       })
     }
   }
