@@ -245,7 +245,7 @@ GROUP BY user_id, entry_date, EXTRACT(HOUR FROM entry_timestamp AT TIME ZONE 'UT
 -- Process onboarding payload in a single transaction
 CREATE OR REPLACE FUNCTION public.process_onboarding_check_in(
   p_user_id UUID,
-  p_responses JSONB DEFAULT '[]'::JSONB,
+  p_responses JSONB,
   p_mood_entry JSONB,
   p_summary JSONB DEFAULT NULL
 )
