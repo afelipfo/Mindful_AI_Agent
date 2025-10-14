@@ -1,7 +1,7 @@
 export type MoodEntryType = "text" | "voice" | "emoji" | "photo"
 
 export interface MoodEntry {
-  id: string
+  id?: string
   date: string
   mood: number
   energy: number
@@ -39,4 +39,3 @@ export interface WellnessSnapshot {
   wellnessGoals: WellnessGoal[]
   aiInsights: AIInsight[]
 }
-
