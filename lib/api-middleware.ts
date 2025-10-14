@@ -36,7 +36,7 @@ export async function withRateLimit(
   const headers = new Headers()
   headers.set('X-RateLimit-Limit', limit.toString())
   headers.set('X-RateLimit-Remaining', remaining.toString())
-  headers.set('X-RateLimit-Reset', reset.toISOString())
+  headers.set('X-RateLimit-Reset', new Date(reset).toISOString())
 
   if (!success) {
     return NextResponse.json(
