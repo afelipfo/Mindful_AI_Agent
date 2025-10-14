@@ -28,19 +28,15 @@ export default function SignInPage() {
         redirect: false,
       })
 
-      console.log("Sign in result:", result)
-
       if (result?.error) {
-        setError(`Authentication failed: ${result.error}`)
+        setError("Invalid email or password")
       } else if (result?.ok) {
-        console.log("Sign in successful, redirecting to onboarding")
         router.push("/onboarding")
         router.refresh()
       } else {
-        setError("Unexpected authentication response")
+        setError("Authentication failed. Please try again.")
       }
     } catch (error) {
-      console.error("Sign in error:", error)
       setError("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)
