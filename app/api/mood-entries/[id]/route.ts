@@ -15,7 +15,7 @@ const updateSchema = z.object({
   date: z.string().optional(),
 })
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const rateLimitResult = await withRateLimit(request, "general")
     if (rateLimitResult) {
@@ -28,6 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const payload = updateSchema.parse(body)
 
@@ -63,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { error } = await supabase
       .from("mood_entries")
       .update(updatePayload)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", session.user.id)
 
     if (error) {
@@ -90,7 +91,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const rateLimitResult = await withRateLimit(request, "general")
     if (rateLimitResult) {
@@ -102,11 +103,12 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const supabase = createAdminClient()
     const { error } = await supabase
       .from("mood_entries")
       .delete()
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", session.user.id)
 
     if (error) {
