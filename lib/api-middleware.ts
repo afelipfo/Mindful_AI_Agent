@@ -11,9 +11,10 @@ export function getRateLimitIdentifier(request: NextRequest, userId?: string): s
   }
 
   // Otherwise use IP address
-  const ip = request.ip ??
-    request.headers.get('x-forwarded-for')?.split(',')[0] ??
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
+    request.headers.get('x-client-ip') ??
+    request.headers.get('cf-connecting-ip') ??
     '127.0.0.1'
 
   return `ip:${ip}`
