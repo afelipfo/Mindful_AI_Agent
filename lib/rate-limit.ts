@@ -118,7 +118,7 @@ export async function applyRateLimit(
       return { success: true, limit: 0, remaining: 0, reset: new Date() }
     }
 
-    return await limiter.checkLimit(identifier)
+    return await limiter.limit(identifier)
   } else {
     // In-memory fallback
     const limiter = type === 'ai'
