@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +25,8 @@ export async function GET(
       return NextResponse.json({ error: "Insight ID is required" }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { data, error } = await supabase
       .from("ai_insights")
       .select("id, insight_type, title, description, action, is_read, created_at")
@@ -73,7 +75,8 @@ export async function PUT(
       return NextResponse.json({ error: "isRead must be a boolean" }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { data, error } = await supabase
       .from("ai_insights")
       .update({ is_read: isRead })
@@ -116,7 +119,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Insight ID is required" }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { error } = await supabase
       .from("ai_insights")
       .delete()

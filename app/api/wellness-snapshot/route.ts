@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 import type { WellnessSnapshot } from "@/types/wellness"
 import {
   DAY_LABELS,
@@ -26,7 +27,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id
-    const supabase = createAdminClient()
+    const adminClient = tryCreateAdminClient()
+    const supabase = adminClient ?? (await createServerClient())
 
     const [
       { data: moodEntriesData },

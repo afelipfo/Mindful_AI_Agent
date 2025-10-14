@@ -3,7 +3,8 @@ import { z, ZodError } from "zod"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const updateSchema = z.object({
   moodScore: z.number().min(1).max(10).optional(),
@@ -36,7 +37,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "No fields to update" }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
 
     const updatePayload: Record<string, unknown> = {}
     if (typeof payload.moodScore === "number") {
@@ -104,7 +106,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     const { id } = await params
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { error } = await supabase
       .from("mood_entries")
       .delete()

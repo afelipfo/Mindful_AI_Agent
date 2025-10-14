@@ -3,7 +3,8 @@ import { z, ZodError } from "zod"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const metadataSchema = z
   .object({
@@ -68,56 +69,107 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id
-    const supabase = createAdminClient()
+    const adminClient = tryCreateAdminClient()
     const filteredResponses = payload.responses.filter((response) => response.response.trim().length > 0)
 
-    console.log("[DEBUG] Saving onboarding data for user:", userId)
-    console.log("[DEBUG] Filtered responses:", filteredResponses.length)
-    console.log("[DEBUG] Mood entry:", {
-      ...payload.moodEntry,
-      entryType:
+    if (adminClient) {
+      const { error: rpcError } = await adminClient.rpc("process_onboarding_check_in", {
+        p_user_id: userId,
+        p_responses: filteredResponses,
+        p_mood_entry: {
+          ...payload.moodEntry,
+          entryType:
+            payload.moodEntry.entryType === "voice" ||
+            payload.moodEntry.entryType === "emoji" ||
+            payload.moodEntry.entryType === "photo"
+              ? payload.moodEntry.entryType
+              : "text",
+          timestamp: new Date().toISOString(),
+        },
+        p_summary: payload.summary ?? null,
+      })
+
+      if (rpcError) {
+        throw rpcError
+      }
+
+      await adminClient
+        .from("profiles")
+        .update({ onboarding_completed: true })
+        .eq("id", userId)
+    } else {
+      const supabase = await createServerClient()
+
+      if (filteredResponses.length > 0) {
+        const { error: responsesError } = await supabase
+          .from("onboarding_responses")
+          .upsert(
+            filteredResponses.map((response) => ({
+              user_id: userId,
+              step: response.step,
+              step_title: response.stepTitle,
+              response: response.response,
+              metadata: response.metadata ?? null,
+            })),
+            { onConflict: "user_id,step" },
+          )
+
+        if (responsesError) {
+          throw responsesError
+        }
+      }
+
+      const moodScore = Math.max(1, Math.min(10, Math.round(payload.moodEntry.moodScore)))
+      const energyLevel = Math.max(1, Math.min(10, Math.round(payload.moodEntry.energyLevel)))
+      const entryType =
         payload.moodEntry.entryType === "voice" ||
         payload.moodEntry.entryType === "emoji" ||
         payload.moodEntry.entryType === "photo"
           ? payload.moodEntry.entryType
-          : "text",
-      timestamp: new Date().toISOString(),
-    })
+          : "text"
+      const moodDate = payload.moodEntry.date ?? new Date().toISOString().slice(0, 10)
+      const timestamp = payload.moodEntry.timestamp ?? new Date().toISOString()
 
-    const { error: rpcError } = await supabase.rpc("process_onboarding_check_in", {
-      p_user_id: userId,
-      p_responses: filteredResponses,
-      p_mood_entry: {
-        ...payload.moodEntry,
-        entryType:
-          payload.moodEntry.entryType === "voice" ||
-          payload.moodEntry.entryType === "emoji" ||
-          payload.moodEntry.entryType === "photo"
-            ? payload.moodEntry.entryType
-            : "text",
-        timestamp: new Date().toISOString(),
-      },
-      p_summary: payload.summary ?? null,
-    })
+      const { error: moodError } = await supabase.from("mood_entries").insert({
+        user_id: userId,
+        date: moodDate,
+        mood_score: moodScore,
+        energy_level: energyLevel,
+        emotions: payload.moodEntry.emotions ?? [],
+        triggers: payload.moodEntry.triggers ?? [],
+        coping_strategies: payload.moodEntry.coping ?? [],
+        entry_type: entryType,
+        note: payload.moodEntry.note ?? null,
+        audio_url: payload.moodEntry.audioUrl ?? null,
+        photo_url: payload.moodEntry.photoUrl ?? null,
+        entry_timestamp: timestamp,
+      })
 
-    if (rpcError) {
-      console.error("[ERROR] RPC Error:", rpcError)
-      throw rpcError
-    }
+      if (moodError) {
+        throw moodError
+      }
 
-    console.log("[SUCCESS] Onboarding data saved successfully")
+      if (payload.summary?.analysisSummary) {
+        await supabase
+          .from("ai_insights")
+          .upsert(
+            {
+              user_id: userId,
+              insight_type: "recommendation",
+              title: `Mood insight${
+                payload.summary.detectedMood ? `: ${payload.summary.detectedMood}` : ""
+              }`,
+              description: payload.summary.analysisSummary,
+              action: "Review recommendations",
+            },
+            { onConflict: "user_id,description" },
+          )
+      }
 
-    // Mark onboarding as completed
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true })
-      .eq('id', userId)
-
-    if (profileError) {
-      console.error("[ERROR] Failed to update onboarding status:", profileError)
-      // Don't fail the request if profile update fails
-    } else {
-      console.log("[SUCCESS] Onboarding marked as completed for user:", userId)
+      await supabase
+        .from("profiles")
+        .update({ onboarding_completed: true })
+        .eq("id", userId)
     }
 
     return NextResponse.json({ success: true })

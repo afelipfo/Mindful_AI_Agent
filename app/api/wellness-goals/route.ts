@@ -3,7 +3,8 @@ import { z, ZodError } from "zod"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const goalSchema = z.object({
   goal: z.string().min(3).max(120),
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { data, error } = await supabase
       .from("wellness_goals")
       .select("id, goal, target_value, current_value, unit, progress, is_active")
@@ -56,7 +58,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const payload = goalSchema.parse(body)
 
-    const supabase = createAdminClient()
+    const supabaseAdmin = tryCreateAdminClient()
+    const supabase = supabaseAdmin ?? (await createServerClient())
     const { data, error } = await supabase
       .from("wellness_goals")
       .insert({
