@@ -184,7 +184,7 @@ export default function OnboardingPage() {
       const nextStepIndex = currentStepIndex + 1
 
       if (nextStepIndex < onboardingQuestions.length) {
-        const aiMessage: Message = {
+        const aiMessage: ConversationMessage = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: onboardingQuestions[nextStepIndex].question,
