@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS mood_entries (
   audio_url TEXT,
   photo_url TEXT,
   entry_timestamp TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-  entry_hour SMALLINT GENERATED ALWAYS AS (EXTRACT(HOUR FROM entry_timestamp)) STORED,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
@@ -74,7 +73,6 @@ CREATE TABLE IF NOT EXISTS ai_insights (
 CREATE INDEX idx_mood_entries_user_id ON mood_entries(user_id);
 CREATE INDEX idx_mood_entries_date ON mood_entries(date DESC);
 CREATE INDEX idx_mood_entries_user_date ON mood_entries(user_id, date DESC);
-CREATE INDEX idx_mood_entries_user_hour ON mood_entries(user_id, entry_hour);
 CREATE INDEX idx_onboarding_responses_user_id ON onboarding_responses(user_id);
 CREATE INDEX idx_wellness_goals_user_id ON wellness_goals(user_id);
 CREATE INDEX idx_ai_insights_user_id ON ai_insights(user_id);
@@ -238,11 +236,11 @@ GROUP BY user_id, strategy;
 CREATE OR REPLACE VIEW public.user_energy_by_hour AS
 SELECT
   user_id,
-  entry_hour,
+  EXTRACT(HOUR FROM entry_timestamp AT TIME ZONE 'UTC')::SMALLINT AS entry_hour,
   DATE(entry_timestamp) AS entry_date,
   ROUND(AVG(energy_level)::NUMERIC, 2) AS avg_energy
 FROM mood_entries
-GROUP BY user_id, entry_date, entry_hour;
+GROUP BY user_id, entry_date, EXTRACT(HOUR FROM entry_timestamp AT TIME ZONE 'UTC')::SMALLINT;
 
 -- Process onboarding payload in a single transaction
 CREATE OR REPLACE FUNCTION public.process_onboarding_check_in(
