@@ -64,7 +64,7 @@ export default function SignUpPage() {
         router.push("/onboarding")
         router.refresh()
       }
-    } catch (error) {
+    } catch {
       setError("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)

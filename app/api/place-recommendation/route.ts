@@ -1,8 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+interface FoursquarePlace {
+  name?: string
+  location?: {
+    formatted_address?: string
+  }
+}
+
+interface FoursquareResponse {
+  results: FoursquarePlace[]
+}
+
 export async function POST(request: NextRequest) {
+  const parsedBody: Partial<{ detectedMood: string; latitude: number; longitude: number }> = await request
+    .json()
+    .catch(() => ({}))
+
+  const detectedMoodKey = parsedBody.detectedMood ?? "anxious"
+  const latitude = typeof parsedBody.latitude === "number" ? parsedBody.latitude : undefined
+  const longitude = typeof parsedBody.longitude === "number" ? parsedBody.longitude : undefined
+
   try {
-    const { detectedMood, latitude, longitude } = await request.json()
 
     // Mood to place type mapping
     const moodPlaces: Record<string, { categories: string; type: string; reason: string; benefits: string }> = {
@@ -44,7 +62,7 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const placeData = moodPlaces[detectedMood] || moodPlaces.anxious
+    const placeData = moodPlaces[detectedMoodKey] || moodPlaces.anxious
 
     // If coordinates provided, try Foursquare API
     if (latitude && longitude && process.env.FOURSQUARE_API_KEY) {
@@ -59,7 +77,7 @@ export async function POST(request: NextRequest) {
       )
 
       if (response.ok) {
-        const data = await response.json()
+        const data = (await response.json()) as FoursquareResponse
         if (data.results && data.results.length > 0) {
           const place = data.results[0]
           return NextResponse.json({
@@ -77,7 +95,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[v0] Place recommendation error:", error)
 
-    const fallbacks: Record<string, any> = {
+    const fallbacks: Record<string, { type: string; reason: string; benefits: string }> = {
       anxious: {
         type: "A botanical garden",
         reason: "Nature exposure reduces cortisol by 21%",
@@ -90,7 +108,6 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const body = await request.json()
-    return NextResponse.json(fallbacks[body.detectedMood] || fallbacks.anxious)
+    return NextResponse.json(fallbacks[detectedMoodKey] ?? fallbacks.anxious)
   }
 }

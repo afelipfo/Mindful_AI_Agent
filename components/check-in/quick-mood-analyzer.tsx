@@ -50,6 +50,31 @@ interface ImageAttachment {
   analysis?: ImageAnalysis
 }
 
+interface PersistPayload {
+  responses: Array<{
+    step: number
+    stepTitle: string
+    response: string
+    metadata?: Record<string, unknown>
+  }>
+  moodEntry: {
+    moodScore: number
+    energyLevel: number
+    emotions: string[]
+    triggers: string[]
+    coping: string[]
+    entryType: "text" | "voice" | "photo"
+    note: string
+    audioUrl?: string | null
+    photoUrl?: string | null
+  }
+  summary: {
+    analysisSummary: string
+    confidence: number
+    detectedMood: string
+  }
+}
+
 export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
   const [input, setInput] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -65,6 +90,137 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const { toast } = useToast()
+
+  const persistQuickCheckIn = async (
+    analysis: EmpathyRecommendation,
+    textInsights: TextAnalysis | null,
+    voice: VoiceAttachment | null,
+    image: ImageAttachment | null,
+    originalInput: string,
+  ) => {
+    try {
+      const responses: PersistPayload["responses"] = []
+      if (originalInput.trim()) {
+        responses.push({
+          step: 1,
+          stepTitle: "Quick text reflection",
+          response: originalInput.trim(),
+          metadata: textInsights ? { summary: textInsights.summary, mood: textInsights.moodLabel } : undefined,
+        })
+      }
+
+      if (voice) {
+        responses.push({
+          step: responses.length + 1,
+          stepTitle: "Voice note",
+          response: voice.analysis?.transcript || "Voice recording attached",
+          metadata: {
+            audioUrl: voice.url,
+            summary: voice.analysis?.summary,
+            mood: voice.analysis?.moodLabel,
+            emotions: voice.analysis?.emotions,
+          },
+        })
+      }
+
+      if (image) {
+        responses.push({
+          step: responses.length + 1,
+          stepTitle: "Snapshot",
+          response: image.analysis?.summary || "Photo attached",
+          metadata: {
+            photoUrl: image.url,
+            mood: image.analysis?.moodLabel,
+            confidence: image.analysis?.confidence,
+            emotions: image.analysis?.emotions,
+          },
+        })
+      }
+
+      const emotionSet = new Set<string>()
+      if (textInsights) {
+        textInsights.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
+      }
+      if (voice?.analysis?.emotions) {
+        voice.analysis.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
+      }
+      if (image?.analysis?.emotions) {
+        image.analysis.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
+      }
+      if (analysis.detectedMood) {
+        emotionSet.add(analysis.detectedMood.toLowerCase())
+      }
+
+      const noteSegments: string[] = []
+      if (originalInput.trim()) {
+        noteSegments.push(originalInput.trim())
+      }
+      if (voice?.analysis?.transcript) {
+        noteSegments.push(`Voice: ${voice.analysis.transcript}`)
+      }
+      if (image?.analysis?.summary) {
+        noteSegments.push(`Photo: ${image.analysis.summary}`)
+      }
+
+      const fallbackMoodScore = textInsights
+        ? Math.min(10, Math.max(1, Math.round(textInsights.confidence / 10)))
+        : Math.min(10, Math.max(1, Math.round(analysis.confidence / 10)))
+      const moodScore = textInsights?.moodScore ?? voice?.analysis?.moodScore ?? fallbackMoodScore
+      const energyLevel = textInsights?.energyLevel ?? voice?.analysis?.energyLevel ?? 5
+
+      const entryType: PersistPayload["moodEntry"]["entryType"] = voice
+        ? "voice"
+        : image
+          ? "photo"
+          : "text"
+
+      const payload: PersistPayload = {
+        responses,
+        moodEntry: {
+          moodScore: Math.min(10, Math.max(1, Math.round(moodScore))),
+          energyLevel: Math.min(10, Math.max(1, Math.round(energyLevel))),
+          emotions: Array.from(emotionSet),
+          triggers: [],
+          coping: [],
+          entryType,
+          note: noteSegments.join("\n").slice(0, 1000),
+          audioUrl: voice?.url ?? null,
+          photoUrl: image?.url ?? null,
+        },
+        summary: {
+          analysisSummary: analysis.analysisSummary,
+          confidence: analysis.confidence,
+          detectedMood: analysis.detectedMood,
+        },
+      }
+
+      const response = await fetch("/api/onboarding/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "Sign in to save",
+            description: "Log in to add quick check-ins to your dashboard history.",
+          })
+          return
+        }
+
+        const errorBody = await response.json().catch(() => ({}))
+        throw new Error(errorBody.error || "Failed to save quick check-in")
+      }
+
+      toast({
+        title: "Check-in saved",
+        description: "We added this quick reflection to your wellbeing trends.",
+      })
+    } catch (persistError) {
+      console.error("Quick check-in persistence error:", persistError)
+    }
+  }
 
   const analyzeText = async (text: string): Promise<TextAnalysis | null> => {
     if (!text.trim()) {
@@ -252,6 +408,13 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         recentMoods,
       }
 
+      if (textInsights && typeof textInsights.confidence === "number") {
+        const derivedMoodScore = Math.min(10, Math.max(1, Math.round(textInsights.confidence / 10)))
+        if (!recentMoods.length) {
+          recentMoods.push(derivedMoodScore)
+        }
+      }
+
       if (textInsights) {
         payload.mood = textInsights.moodLabel
         payload.moodScore = textInsights.moodScore
@@ -311,6 +474,8 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         title: "Analysis ready",
         description: "We prepared a tailored support plan based on your reflection.",
       })
+
+      await persistQuickCheckIn(data, textInsights, voiceAttachment, imageAttachment, input)
     } catch (analysisError) {
       console.error("Mood analysis failed:", analysisError)
       setError(

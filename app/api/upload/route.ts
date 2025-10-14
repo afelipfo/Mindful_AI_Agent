@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now()
     const userId = session.user.id
-    const extension = file.name.split('.').pop() || 'bin'
     const filename = `${userId}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
     // Upload to Vercel Blob

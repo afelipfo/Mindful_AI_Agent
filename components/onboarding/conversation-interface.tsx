@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { Send, Brain, MessageSquare, Mic, Smile, Camera } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -224,6 +225,36 @@ export function ConversationInterface({
             >
               {message.metadata?.emoji && <div className="text-3xl mb-2">{message.metadata.emoji}</div>}
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+
+              {message.metadata?.transcript && (
+                <p className="mt-2 text-xs italic text-primary-foreground/80 sm:text-text-secondary">
+                  Transcript: {message.metadata.transcript}
+                </p>
+              )}
+
+              {message.metadata?.summary && (
+                <p className="mt-2 text-xs text-primary-foreground/80 sm:text-text-secondary">
+                  Insight: {message.metadata.summary}
+                </p>
+              )}
+
+              {(message.metadata?.audioUrl || message.metadata?.photoUrl) && (
+                <div className="mt-3 space-y-3">
+                  {message.metadata.audioUrl && (
+                    <audio controls className="w-full" src={message.metadata.audioUrl} />
+                  )}
+                  {message.metadata.photoUrl && (
+                    <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border">
+                      <Image
+                        src={message.metadata.photoUrl}
+                        alt="Attached check-in snapshot"
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}

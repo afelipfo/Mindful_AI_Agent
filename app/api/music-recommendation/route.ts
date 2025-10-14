@@ -1,8 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+interface SpotifyArtist {
+  name: string
+}
+
+interface SpotifyTrack {
+  name: string
+  artists: SpotifyArtist[]
+  external_urls: { spotify: string }
+}
+
+interface SpotifyRecommendationResponse {
+  tracks: SpotifyTrack[]
+}
+
 export async function POST(request: NextRequest) {
+  const parsedBody: Partial<{ detectedMood: string }> = await request
+    .json()
+    .catch(() => ({ detectedMood: "anxious" }))
+
+  const detectedMoodKey = parsedBody.detectedMood ?? "anxious"
+
   try {
-    const { detectedMood } = await request.json()
 
     // Mood to Spotify audio features mapping
     const moodFeatures: Record<string, { valence: number; energy: number; tempo: { min: number; max: number } }> = {
@@ -14,7 +33,7 @@ export async function POST(request: NextRequest) {
       excited: { valence: 0.9, energy: 0.85, tempo: { min: 130, max: 160 } },
     }
 
-    const features = moodFeatures[detectedMood] || moodFeatures.anxious
+    const features = moodFeatures[detectedMoodKey] || moodFeatures.anxious
 
     // Get Spotify access token
     const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -43,8 +62,8 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to get music recommendations")
     }
 
-    const data = await musicResponse.json()
-    const track = data.tracks[0]
+    const data = (await musicResponse.json()) as SpotifyRecommendationResponse
+    const track = data.tracks?.[0]
 
     if (!track) {
       throw new Error("No tracks found")
@@ -61,7 +80,7 @@ export async function POST(request: NextRequest) {
     console.error("[v0] Music recommendation error:", error)
 
     // Fallback recommendations
-    const fallbacks: Record<string, any> = {
+    const fallbacks: Record<string, { title: string; artist: string; reason: string; spotifyUrl: string; appleMusicUrl: string }> = {
       anxious: {
         title: "Weightless",
         artist: "Marconi Union",
@@ -78,7 +97,6 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const body = await request.json()
-    return NextResponse.json(fallbacks[body.detectedMood] || fallbacks.anxious)
+    return NextResponse.json(fallbacks[detectedMoodKey] ?? fallbacks.anxious)
   }
 }

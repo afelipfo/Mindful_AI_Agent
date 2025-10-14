@@ -5,7 +5,7 @@ An AI-powered mental wellness companion that tracks emotional states through mul
 ## Features
 
 - **Conversational Onboarding**: 6-step personalized setup flow with multimodal inputs (text, voice, emoji, photo)
-- **Multimodal Check-Ins**: Express yourself through text, voice, emojis, or photos integrated into the conversational flow
+- **Multimodal Check-Ins**: Express yourself through text, voice, emojis, or photos—both in onboarding and the quick analyzer on the landing page (signed-in quick check-ins are stored alongside your dashboard history)
 - **AI Empathy & Recommendations**: Real-time personalized wellness support powered by 5 external APIs:
   - OpenAI GPT-4o-mini for empathetic validation messages
   - Spotify Web API for mood-appropriate music
@@ -48,8 +48,17 @@ npm run dev
 Add these to your `.env.local` file or configure them in the Vars section of the v0 in-chat sidebar:
 
 \`\`\`env
-# Required for AI empathy messages and recommendations
+# Required for AI empathy messages, multimodal analysis, and recommendations
 OPENAI_API_KEY=sk-...
+
+# Supabase (database + auth)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=public-anon-key
+SUPABASE_SERVICE_ROLE_KEY=service-role-key
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate_secure_random_value
 
 # Required for music recommendations
 SPOTIFY_CLIENT_ID=your_client_id
@@ -60,6 +69,18 @@ FOURSQUARE_API_KEY=your_api_key
 \`\`\`
 
 **Note**: Open Library and Quotable APIs require no authentication. The app will use fallback recommendations if API keys are missing.
+
+### Quick verification
+
+1. Restart the dev server after populating `.env.local` so Next.js and the Supabase client pick up the new keys.
+2. Sign up through `/auth/signup`, then walk through onboarding. On any step try recording a **voice note** or uploading a **photo**—you should see the transcript/insight appear in the chat before the empathy panel.
+3. From the home page, run a quick analyzer check-in (text + optional voice/photo) while signed in—the result should appear immediately and be written to your dashboard history.
+4. Load the dashboard (or refresh `/onboarding` while on the “Dashboard” tab) to confirm the charts now reflect the new entries.
+5. Hit the wellness snapshot API directly to inspect the stored data:
+   ```bash
+   curl -H "cookie: $(pbpaste)" http://localhost:3000/api/wellness-snapshot
+   ```
+   Replace the cookie header with one copied from your authenticated browser session.
 
 ## Project Structure
 

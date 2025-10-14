@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { ProgressSidebar } from "@/components/onboarding/progress-sidebar"
 import { ConversationInterface } from "@/components/onboarding/conversation-interface"
@@ -137,6 +139,8 @@ const stepTitles = [
 ]
 
 export default function OnboardingPage() {
+  const { status } = useSession()
+  const router = useRouter()
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -265,8 +269,17 @@ export default function OnboardingPage() {
   )
 
   useEffect(() => {
-    loadSnapshot()
-  }, [loadSnapshot])
+    if (status === "unauthenticated") {
+      const callbackUrl = encodeURIComponent("/onboarding")
+      router.replace(`/auth/signin?callbackUrl=${callbackUrl}`)
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      loadSnapshot()
+    }
+  }, [status, loadSnapshot])
 
   const energyHeatmapData = [
     { day: "Mon", hour: 8, energy: 5 },
@@ -305,6 +318,14 @@ export default function OnboardingPage() {
       },
     ])
   }, [])
+
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-sm text-text-muted">Preparing your onboarding experience…</div>
+      </div>
+    )
+  }
 
   const handleSendMessage = (message: string, type?: MessageType, metadata?: MessageMetadata) => {
     const userMessage: ConversationMessage = {

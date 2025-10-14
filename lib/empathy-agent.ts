@@ -62,6 +62,19 @@ export interface EmpathyResponse extends RecommendationSet {
   analysisSources: AnalysisSource[]
 }
 
+interface OpenLibraryDoc {
+  cover_i?: number
+  author_name?: string[]
+  ratings_average?: number
+  title: string
+}
+
+interface OpenLibraryResponse {
+  docs?: OpenLibraryDoc[]
+}
+
+type QuotableRandomResponse = Array<{ content: string; author: string }>
+
 // Detect mood category from emotions and score
 export function detectMoodCategory(emotions: string[], moodScore: number): MoodCategory {
   const emotionMap: Record<string, MoodCategory> = {
@@ -654,10 +667,10 @@ async function getBookRecommendation(detectedMood: MoodCategory) {
       throw new Error("Failed to fetch books")
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as OpenLibraryResponse
 
     const qualityBooks = data.docs?.filter(
-      (book: any) => book.cover_i && book.author_name && book.ratings_average && book.ratings_average >= 3.8,
+      (book) => Boolean(book.cover_i && book.author_name?.length && book.ratings_average && book.ratings_average >= 3.8),
     )
 
     if (!qualityBooks || qualityBooks.length === 0) {
@@ -668,8 +681,8 @@ async function getBookRecommendation(detectedMood: MoodCategory) {
 
     return {
       title: book.title,
-      author: book.author_name[0],
-      relevance: `Recommended for ${randomSubject} - rated ${book.ratings_average.toFixed(1)}/5`,
+      author: book.author_name![0],
+      relevance: `Recommended for ${randomSubject} - rated ${book.ratings_average!.toFixed(1)}/5`,
       amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(book.title)}`,
       coverUrl: `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`,
     }
@@ -706,7 +719,8 @@ async function getQuoteRecommendation(detectedMood: MoodCategory) {
       throw new Error("Failed to fetch quote")
     }
 
-    const quote = await response.json()
+    const quoteResponse = (await response.json()) as QuotableRandomResponse
+    const quote = quoteResponse[0]
 
     if (!quote || !quote.content || !quote.author) {
       throw new Error("Invalid quote data")

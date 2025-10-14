@@ -1,8 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+interface QuotableQuote {
+  content: string
+  author: string
+}
+
 export async function POST(request: NextRequest) {
+  const parsedBody: Partial<{ detectedMood: string }> = await request
+    .json()
+    .catch(() => ({ detectedMood: "anxious" }))
+
+  const detectedMoodKey = parsedBody.detectedMood ?? "anxious"
+
   try {
-    const { detectedMood } = await request.json()
 
     // Mood to tags mapping
     const moodTags: Record<string, string> = {
@@ -14,7 +24,7 @@ export async function POST(request: NextRequest) {
       excited: "inspirational|success|opportunity",
     }
 
-    const tags = moodTags[detectedMood] || moodTags.anxious
+    const tags = moodTags[detectedMoodKey] || moodTags.anxious
 
     // Call Quotable API
     const response = await fetch(`https://api.quotable.io/quotes/random?tags=${tags}&maxLength=150`, {
@@ -25,7 +35,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to fetch quote")
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as QuotableQuote[]
     const quote = data[0]
 
     if (!quote) {
@@ -40,7 +50,7 @@ export async function POST(request: NextRequest) {
     console.error("[v0] Quote recommendation error:", error)
 
     // Fallback quotes
-    const fallbacks: Record<string, any> = {
+    const fallbacks: Record<string, { text: string; author: string }> = {
       anxious: {
         text: "You are braver than you believe, stronger than you seem, and smarter than you think.",
         author: "A.A. Milne",
@@ -67,7 +77,6 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const body = await request.json()
-    return NextResponse.json(fallbacks[body.detectedMood] || fallbacks.anxious)
+    return NextResponse.json(fallbacks[detectedMoodKey] ?? fallbacks.anxious)
   }
 }

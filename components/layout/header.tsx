@@ -26,6 +26,9 @@ export function Header({ onCheckInClick }: HeaderProps = {}) {
         </Link>
 
         <div className="flex items-center gap-4">
+          <Button variant="ghost" asChild className="hidden md:inline-flex">
+            <Link href="/auth/signin">Sign in</Link>
+          </Button>
           {onCheckInClick ? (
             <Button onClick={onCheckInClick}>Get Started</Button>
           ) : (
@@ -49,6 +52,11 @@ export function Header({ onCheckInClick }: HeaderProps = {}) {
       {mobileMenuOpen && (
         <div className="border-t border-border bg-background md:hidden">
           <nav className="container mx-auto flex flex-col gap-4 px-4 py-4">
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/auth/signin" onClick={() => setMobileMenuOpen(false)}>
+                Sign in
+              </Link>
+            </Button>
             {onCheckInClick ? (
               <Button
                 className="w-full"

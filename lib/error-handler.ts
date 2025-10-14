@@ -64,7 +64,7 @@ export function isOperationalError(error: unknown): boolean {
 /**
  * Log error with appropriate level
  */
-export function logError(error: unknown, context?: Record<string, any>) {
+export function logError(error: unknown, context?: Record<string, unknown>) {
   const message = getErrorMessage(error)
   const isOperational = isOperationalError(error)
 
