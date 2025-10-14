@@ -5,7 +5,13 @@ import { createClient } from '@supabase/supabase-js'
 
 // Create Supabase client if environment variables are available
 const createSupabaseClient = () => {
+  console.log("Creating Supabase client with env vars:", {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "present" : "missing",
+    anonKey: process.env.SUPABASE_ANON_KEY ? "present" : "missing",
+  })
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    console.error("Supabase environment variables missing")
     return null
   }
   return createClient(
@@ -37,19 +43,29 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        console.log('Credentials provider called with:', {
+          email: credentials?.email,
+          hasPassword: !!credentials?.password
+        })
+
         if (!credentials?.email || !credentials?.password) {
+          console.error('Missing email or password')
           throw new Error('Email and password required')
         }
 
         if (!supabase) {
+          console.error('Supabase client not available')
           throw new Error('Authentication not configured')
         }
 
         try {
+          console.log('Attempting Supabase sign in...')
           const { data, error } = await supabase.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,
           })
+
+          console.log('Supabase response:', { hasData: !!data, hasUser: !!data?.user, error: error?.message })
 
           if (error || !data.user) {
             console.error('Supabase auth error:', error)
@@ -58,12 +74,15 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Supabase auth successful for user:', data.user.email)
 
-          return {
+          const user = {
             id: data.user.id,
             email: data.user.email!,
             name: data.user.user_metadata?.full_name || data.user.email!.split('@')[0],
             image: data.user.user_metadata?.avatar_url,
           }
+
+          console.log('Returning user object:', user)
+          return user
         } catch (error) {
           console.error('Credentials provider error:', error)
           throw error
