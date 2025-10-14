@@ -43,7 +43,7 @@ export async function withRateLimit(
       {
         error: 'Too many requests',
         message: 'You have exceeded the rate limit. Please try again later.',
-        retryAfter: reset.toISOString(),
+        retryAfter: new Date(reset).toISOString(),
       },
       {
         status: 429,
