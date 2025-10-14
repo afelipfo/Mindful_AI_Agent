@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { ProgressSidebar } from "@/components/onboarding/progress-sidebar"
 import { ConversationInterface } from "@/components/onboarding/conversation-interface"
@@ -11,11 +11,12 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
-import { getDemoWellnessSnapshot } from "@/lib/wellness-data"
+import { getFallbackWellnessSnapshot } from "@/lib/wellness-data"
 import { format } from "date-fns"
 import { Progress } from "@/components/ui/progress"
 import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
 import type { EmpathyResponse } from "@/lib/empathy-agent"
+import type { WellnessSnapshot } from "@/lib/wellness-data"
 
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamic(
@@ -57,6 +58,40 @@ interface Step {
   id: number
   title: string
   status: "completed" | "active" | "upcoming"
+}
+
+interface EmpathyRequestPayload {
+  context: string
+  emotions: string[]
+  triggers: string[]
+  recentMoods: number[]
+  mood?: string
+  moodScore?: number
+  energyLevel?: number
+  voiceInsights?: {
+    transcript: string
+    moodLabel?: string
+    moodScore?: number
+    energyLevel?: number
+    emotions?: string[]
+    summary?: string
+  }
+  imageInsights?: {
+    moodLabel?: string
+    confidence?: number
+    emotions?: string[]
+    summary?: string
+  }
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+const EMPTY_SNAPSHOT: WellnessSnapshot = {
+  moodEntries: [],
+  triggerFrequency: {},
+  copingEffectiveness: {},
+  wellnessGoals: [],
+  aiInsights: [],
 }
 
 const onboardingQuestions = [
@@ -108,6 +143,9 @@ export default function OnboardingPage() {
   const [empathyData, setEmpathyData] = useState<EmpathyResponse | null>(null)
   const [isCompleted, setIsCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState("empathy")
+  const [responsesByStep, setResponsesByStep] = useState<Record<number, ConversationMessage>>({})
+  const [snapshot, setSnapshot] = useState<WellnessSnapshot>(EMPTY_SNAPSHOT)
+  const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
   const [steps, setSteps] = useState<Step[]>(
     stepTitles.map((title, index) => ({
       id: index + 1,
@@ -116,19 +154,119 @@ export default function OnboardingPage() {
     })),
   )
 
-  const wellnessSnapshot = useMemo(() => getDemoWellnessSnapshot(), [])
   const {
-    moodEntries: demoMoodEntries,
-    triggerFrequency: demoTriggerFrequency,
-    copingEffectiveness: demoCopingEffectiveness,
-    wellnessGoals: demoWellnessGoals,
-    aiInsights: demoAiInsights,
-  } = wellnessSnapshot
+    moodEntries,
+    triggerFrequency,
+    copingEffectiveness,
+    wellnessGoals,
+    aiInsights,
+  } = snapshot
 
-  const recentEntries = demoMoodEntries.slice(0, 7)
-  const avgMood = (recentEntries.reduce((sum, entry) => sum + entry.mood, 0) / recentEntries.length).toFixed(1)
-  const avgEnergy = (recentEntries.reduce((sum, entry) => sum + entry.energy, 0) / recentEntries.length).toFixed(1)
-  const wellbeingScore = 75
+  const recentEntries = moodEntries.slice(0, 7)
+  const avgMood = recentEntries.length
+    ? (recentEntries.reduce((sum, entry) => sum + entry.mood, 0) / recentEntries.length).toFixed(1)
+    : "0.0"
+  const avgEnergy = recentEntries.length
+    ? (recentEntries.reduce((sum, entry) => sum + entry.energy, 0) / recentEntries.length).toFixed(1)
+    : "0.0"
+  const wellbeingScore = recentEntries.length
+    ? Math.min(
+        100,
+        Math.max(
+          30,
+          Math.round(
+            (recentEntries.reduce((sum, entry) => sum + entry.mood + entry.energy, 0) /
+              (recentEntries.length * 20)) *
+              100,
+          ),
+        ),
+      )
+    : 70
+
+  const loadSnapshot = useCallback(async () => {
+    try {
+      setIsSnapshotLoading(true)
+      const response = await fetch("/api/wellness-snapshot", { cache: "no-store" })
+      if (!response.ok) {
+        throw new Error("Failed to fetch wellness snapshot")
+      }
+      const data = (await response.json()) as WellnessSnapshot
+      setSnapshot(data)
+    } catch (error) {
+      console.error("[mindful-ai] Failed to load wellness snapshot:", error)
+      setSnapshot((prev) => (prev.moodEntries.length ? prev : getFallbackWellnessSnapshot()))
+    } finally {
+      setIsSnapshotLoading(false)
+    }
+  }, [])
+
+  const persistCheckIn = useCallback(
+    async (conversation: ConversationMessage[], payload: EmpathyRequestPayload, empathy: EmpathyResponse) => {
+      try {
+        const latestUserMessage = [...conversation].reverse().find((msg) => msg.role === "user")
+        const entryType = latestUserMessage?.type ?? "text"
+        const audioUrl = latestUserMessage?.metadata?.audioUrl
+        const photoUrl = latestUserMessage?.metadata?.photoUrl
+        const truncatedNote = payload.context.slice(-1000)
+
+        const responses = stepTitles
+          .map((title, index) => {
+            const responseMessage = responsesByStep[index]
+            if (!responseMessage || !responseMessage.content.trim()) {
+              return null
+            }
+            return {
+              step: index + 1,
+              stepTitle: title,
+              response: responseMessage.content,
+              metadata: responseMessage.metadata,
+            }
+          })
+          .filter((response): response is NonNullable<typeof response> => Boolean(response))
+
+        const requestBody = {
+          responses,
+          moodEntry: {
+            moodScore: clamp(typeof payload.moodScore === "number" ? payload.moodScore : 5, 1, 10),
+            energyLevel: clamp(typeof payload.energyLevel === "number" ? payload.energyLevel : 5, 1, 10),
+            emotions: payload.emotions,
+            triggers: payload.triggers,
+            coping: [],
+            entryType: entryType ?? "text",
+            note: truncatedNote,
+            audioUrl,
+            photoUrl,
+          },
+          summary: {
+            analysisSummary: empathy.analysisSummary,
+            confidence: empathy.confidence,
+            detectedMood: empathy.detectedMood,
+          },
+        }
+
+        const response = await fetch("/api/onboarding/check-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        })
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}))
+          throw new Error(errorBody.error || "Failed to save onboarding responses")
+        }
+
+        await loadSnapshot()
+        setResponsesByStep({})
+      } catch (error) {
+        console.error("[mindful-ai] Failed to persist onboarding data:", error)
+      }
+    },
+    [responsesByStep, loadSnapshot],
+  )
+
+  useEffect(() => {
+    loadSnapshot()
+  }, [loadSnapshot])
 
   const energyHeatmapData = [
     { day: "Mon", hour: 8, energy: 5 },
@@ -154,9 +292,9 @@ export default function OnboardingPage() {
     { day: "Sun", hour: 20, energy: 7 },
   ]
 
-  const patterns = demoAiInsights.filter((i) => i.type === "pattern")
-  const recommendations = demoAiInsights.filter((i) => i.type === "recommendation")
-  const alerts = demoAiInsights.filter((i) => i.type === "alert")
+  const patterns = aiInsights.filter((i) => i.type === "pattern")
+  const recommendations = aiInsights.filter((i) => i.type === "recommendation")
+  const alerts = aiInsights.filter((i) => i.type === "alert")
 
   useEffect(() => {
     setMessages([
@@ -178,6 +316,10 @@ export default function OnboardingPage() {
     }
     const updatedConversation = [...messages, userMessage]
     setMessages((prev) => [...prev, userMessage])
+    setResponsesByStep((prev) => ({
+      ...prev,
+      [currentStepIndex]: userMessage,
+    }))
     setIsLoading(true)
 
     setTimeout(() => {
@@ -234,16 +376,20 @@ export default function OnboardingPage() {
         .map((msg) => msg.metadata?.label as string | undefined)
         .filter((label): label is string => Boolean(label))
 
+      const emotionSet = new Set(emotionLabels.map((label) => label.toLowerCase()))
+
       const moodValues = emojiMessages
         .map((msg) => (typeof msg.metadata?.value === "number" ? msg.metadata.value : null))
         .filter((value): value is number => value !== null)
 
-      const payload: Record<string, unknown> = {
-        context:
-          trimmedNarrative ||
-          conversation[conversation.length - 1]?.content ||
-          (emotionLabels.length ? `Recent mood tags: ${emotionLabels.join(", ")}` : ""),
-        emotions: emotionLabels.map((label) => label.toLowerCase()),
+      const context =
+        trimmedNarrative ||
+        conversation[conversation.length - 1]?.content ||
+        (emotionLabels.length ? `Recent mood tags: ${emotionLabels.join(", ")}` : "")
+
+      const payload: EmpathyRequestPayload = {
+        context,
+        emotions: Array.from(emotionSet),
         triggers: [],
         recentMoods: moodValues,
       }
@@ -264,6 +410,75 @@ export default function OnboardingPage() {
         payload.energyLevel = latestMetadata.energy
       }
 
+      const voiceMessage = [...conversation]
+        .reverse()
+        .find((msg) => msg.type === "voice" && msg.metadata && typeof msg.metadata.transcript === "string")
+
+      if (voiceMessage?.metadata?.transcript) {
+        const voiceEmotions = Array.isArray(voiceMessage.metadata.emotions) ? voiceMessage.metadata.emotions : []
+        voiceEmotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
+
+        payload.voiceInsights = {
+          transcript: voiceMessage.metadata.transcript,
+          moodLabel: typeof voiceMessage.metadata.label === "string" ? voiceMessage.metadata.label : undefined,
+          moodScore:
+            typeof voiceMessage.metadata.value === "number" && !Number.isNaN(voiceMessage.metadata.value)
+              ? voiceMessage.metadata.value
+              : undefined,
+          energyLevel:
+            typeof voiceMessage.metadata.energy === "number" && !Number.isNaN(voiceMessage.metadata.energy)
+              ? voiceMessage.metadata.energy
+              : undefined,
+          emotions: voiceEmotions,
+          summary: typeof voiceMessage.metadata.summary === "string" ? voiceMessage.metadata.summary : undefined,
+        }
+
+        payload.context = `${payload.context}\nVoice note: ${voiceMessage.metadata.transcript}`
+
+        if (payload.voiceInsights.moodScore && !payload.moodScore) {
+          payload.moodScore = payload.voiceInsights.moodScore
+        }
+        if (payload.voiceInsights.energyLevel && !payload.energyLevel) {
+          payload.energyLevel = payload.voiceInsights.energyLevel
+        }
+        if (!payload.mood && payload.voiceInsights.moodLabel) {
+          payload.mood = payload.voiceInsights.moodLabel
+        }
+      }
+
+      const imageMessage = [...conversation]
+        .reverse()
+        .find((msg) => msg.type === "photo" && msg.metadata && (msg.metadata.summary || msg.metadata.label))
+
+      if (imageMessage?.metadata) {
+        const imageEmotions = Array.isArray(imageMessage.metadata.emotions) ? imageMessage.metadata.emotions : []
+        imageEmotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
+
+        if (typeof imageMessage.metadata.label === "string") {
+          emotionSet.add(imageMessage.metadata.label.toLowerCase())
+        }
+
+        payload.imageInsights = {
+          moodLabel: typeof imageMessage.metadata.label === "string" ? imageMessage.metadata.label : undefined,
+          confidence:
+            typeof imageMessage.metadata.confidence === "number" && !Number.isNaN(imageMessage.metadata.confidence)
+              ? imageMessage.metadata.confidence
+              : undefined,
+          emotions: imageEmotions,
+          summary: typeof imageMessage.metadata.summary === "string" ? imageMessage.metadata.summary : undefined,
+        }
+
+        if (payload.imageInsights.summary) {
+          payload.context = `${payload.context}\nImage insight: ${payload.imageInsights.summary}`
+        }
+
+        if (!payload.mood && payload.imageInsights.moodLabel) {
+          payload.mood = payload.imageInsights.moodLabel
+        }
+      }
+
+      payload.emotions = Array.from(emotionSet)
+
       const response = await fetch("/api/empathy-recommendations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -271,9 +486,14 @@ export default function OnboardingPage() {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        const data = (await response.json()) as EmpathyResponse
         setEmpathyData(data)
         setIsCompleted(true)
+        setActiveTab("empathy")
+        await persistCheckIn(conversation, payload, data)
+      } else {
+        const errorBody = await response.json().catch(() => ({}))
+        console.error("[mindful-ai] Empathy recommendations failed:", errorBody)
       }
     } catch (error) {
       console.error("Error fetching empathy recommendations:", error)
@@ -343,6 +563,10 @@ export default function OnboardingPage() {
                     <p className="text-base text-text-muted">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
                   </div>
 
+                  {isSnapshotLoading && (
+                    <div className="mb-6 text-sm text-text-muted">Refreshing your latest check-ins...</div>
+                  )}
+
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
                     <MetricCard
                       title="Average Mood"
@@ -358,7 +582,7 @@ export default function OnboardingPage() {
                     />
                     <MetricCard
                       title="Check-Ins"
-                      value={demoMoodEntries.length}
+                      value={moodEntries.length}
                       icon={<Brain className="h-5 w-5" />}
                       trend={{ direction: "up", value: "+3", isPositive: true }}
                     />
@@ -374,7 +598,7 @@ export default function OnboardingPage() {
                     <Card className="lg:col-span-2 p-6">
                       <h2 className="text-lg font-semibold mb-4">Mood & Energy Trends</h2>
                       <p className="text-sm text-text-secondary mb-4">Last 30 days</p>
-                      <MoodTrendChart data={demoMoodEntries} />
+                      <MoodTrendChart data={moodEntries} />
                     </Card>
 
                     <Card className="p-6">
@@ -387,7 +611,7 @@ export default function OnboardingPage() {
                     <Card className="p-6">
                       <h2 className="text-lg font-semibold mb-4">Common Triggers</h2>
                       <p className="text-sm text-text-secondary mb-4">Most frequent patterns affecting your mood</p>
-                      <TriggerCloud triggers={demoTriggerFrequency} />
+                      <TriggerCloud triggers={triggerFrequency} />
                     </Card>
 
                     <Card className="p-6">
@@ -400,7 +624,7 @@ export default function OnboardingPage() {
                   <Card className="p-6 mb-8">
                     <h2 className="text-lg font-semibold mb-4">Wellness Goals</h2>
                     <div className="space-y-6">
-                      {demoWellnessGoals.map((goal) => (
+                      {wellnessGoals.map((goal) => (
                         <div key={goal.goal}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium">{goal.goal}</span>
@@ -420,7 +644,7 @@ export default function OnboardingPage() {
                       Average mood improvement after using each strategy
                     </p>
                     <div className="space-y-3">
-                      {Object.entries(demoCopingEffectiveness)
+                      {Object.entries(copingEffectiveness)
                         .sort(([, a], [, b]) => b - a)
                         .map(([strategy, effectiveness]) => (
                           <div key={strategy} className="flex items-center justify-between">
@@ -490,7 +714,7 @@ export default function OnboardingPage() {
                       <TabsTrigger value="all">
                         All Insights
                         <Badge variant="secondary" className="ml-2">
-                          {demoAiInsights.length}
+                          {aiInsights.length}
                         </Badge>
                       </TabsTrigger>
                       <TabsTrigger value="patterns">
@@ -514,7 +738,7 @@ export default function OnboardingPage() {
                     </TabsList>
 
                     <TabsContent value="all" className="space-y-4">
-                      {demoAiInsights.map((insight, index) => (
+                      {aiInsights.map((insight, index) => (
                         <InsightCard key={index} insight={insight} />
                       ))}
                     </TabsContent>

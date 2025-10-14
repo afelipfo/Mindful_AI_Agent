@@ -7,8 +7,19 @@ interface TriggerCloudProps {
 }
 
 export function TriggerCloud({ triggers }: TriggerCloudProps) {
-  const maxFrequency = Math.max(...Object.values(triggers))
-  const minFrequency = Math.min(...Object.values(triggers))
+  const triggerEntries = Object.entries(triggers).filter(([, frequency]) => frequency > 0)
+
+  if (triggerEntries.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-sm text-text-muted">
+        Log more check-ins to uncover trigger patterns.
+      </div>
+    )
+  }
+
+  const values = triggerEntries.map(([, frequency]) => frequency)
+  const maxFrequency = Math.max(...values)
+  const minFrequency = Math.min(...values)
   const range = maxFrequency - minFrequency
 
   const getFontSize = (frequency: number) => {
@@ -27,7 +38,7 @@ export function TriggerCloud({ triggers }: TriggerCloudProps) {
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-4 p-4">
-      {Object.entries(triggers)
+      {triggerEntries
         .sort(([, a], [, b]) => b - a)
         .map(([trigger, frequency]) => (
           <button

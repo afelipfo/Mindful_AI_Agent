@@ -98,11 +98,11 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
               <div className="flex gap-3 text-xs text-text-muted">
                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
                   <Mic className="h-3 w-3" />
-                  Voice coming soon
+                  Voice insights enabled
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
                   <ImageIcon className="h-3 w-3" />
-                  Image mood soon
+                  Image cues active
                 </span>
               </div>
               <div className="flex gap-2">

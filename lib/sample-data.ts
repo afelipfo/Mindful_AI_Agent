@@ -9,6 +9,8 @@ export interface MoodEntry {
   coping: string[]
   type: "text" | "voice" | "emoji" | "photo"
   note?: string
+  audioUrl?: string
+  photoUrl?: string
 }
 
 export interface WellnessGoal {

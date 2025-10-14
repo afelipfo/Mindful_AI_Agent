@@ -10,6 +10,9 @@ interface EmpathyInput {
   context?: string
   latitude?: number
   longitude?: number
+  voiceTranscript?: string
+  imageMood?: string
+  imageConfidence?: number
 }
 
 interface AnalysisSource {
@@ -197,6 +200,12 @@ function calculateConfidence(input: EmpathyInput): number {
   if (typeof input.energyLevel === "number" && input.energyLevel !== 5) {
     confidence += 5
   }
+  if (input.voiceTranscript && input.voiceTranscript.length > 20) {
+    confidence += 5
+  }
+  if (input.imageMood) {
+    confidence += 5
+  }
 
   return Math.max(45, Math.min(95, Math.round(confidence)))
 }
@@ -258,6 +267,14 @@ function buildAnalysisSources(input: EmpathyInput): AnalysisSource[] {
 
   if (typeof input.energyLevel === "number") {
     sources.push({ type: "history", label: "Energy level", weight: 0.1 })
+  }
+
+  if (input.voiceTranscript) {
+    sources.push({ type: "voice", label: "Voice tone", weight: 0.25 })
+  }
+
+  if (input.imageMood) {
+    sources.push({ type: "photo", label: "Expression analysis", weight: 0.2 })
   }
 
   return normalizeSources(sources)

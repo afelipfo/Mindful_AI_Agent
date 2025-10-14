@@ -21,17 +21,62 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     const validatedData = empathyRecommendationSchema.parse(body)
-    const { mood, context, moodScore, emotions, energyLevel, recentMoods } = validatedData
+    const { mood, context, moodScore, emotions, energyLevel, recentMoods, voiceInsights, imageInsights } = validatedData
+
+    const normalizedVoiceMood =
+      typeof voiceInsights?.moodLabel === "string" ? voiceInsights.moodLabel.toLowerCase() : undefined
+    const normalizedImageMood =
+      typeof imageInsights?.moodLabel === "string" ? imageInsights.moodLabel.toLowerCase() : undefined
 
     let detectedMood: string | undefined = typeof mood === "string" ? mood : undefined
     let score: number | undefined = typeof moodScore === "number" ? moodScore : undefined
+    let inferredEnergy: number | undefined = typeof energyLevel === "number" ? energyLevel : undefined
     let emotionsList: string[] = Array.isArray(emotions) ? emotions.map((e) => e.toLowerCase()) : []
+
+    if (normalizedVoiceMood && !detectedMood) {
+      detectedMood = normalizedVoiceMood
+    }
+
+    if (normalizedImageMood && !detectedMood) {
+      detectedMood = normalizedImageMood
+    }
+
+    if (typeof voiceInsights?.moodScore === "number" && !score) {
+      score = voiceInsights.moodScore
+    }
+
+    if (typeof voiceInsights?.energyLevel === "number" && !inferredEnergy) {
+      inferredEnergy = voiceInsights.energyLevel
+    }
+
+    if (Array.isArray(voiceInsights?.emotions)) {
+      emotionsList.push(...voiceInsights.emotions.map((emotion) => emotion.toLowerCase()))
+    }
+
+    if (Array.isArray(imageInsights?.emotions)) {
+      emotionsList.push(...imageInsights.emotions.map((emotion) => emotion.toLowerCase()))
+    }
+
+    const contextSegments: string[] = []
+    if (typeof context === "string" && context.trim().length > 0) {
+      contextSegments.push(context.trim())
+    }
+    if (voiceInsights?.summary) {
+      contextSegments.push(`Voice insight: ${voiceInsights.summary}`)
+    } else if (voiceInsights?.transcript) {
+      contextSegments.push(`Voice transcript: ${voiceInsights.transcript}`)
+    }
+    if (imageInsights?.summary) {
+      contextSegments.push(`Image insight: ${imageInsights.summary}`)
+    }
+
+    const combinedContext = contextSegments.join("\n")
 
     if (!detectedMood) {
       if (typeof score === "number" && emotionsList.length > 0) {
         detectedMood = detectMoodCategory(emotionsList, score)
-      } else if (typeof context === "string" && context.trim().length > 0) {
-        const inference = inferMoodFromText(context)
+      } else if (combinedContext.trim().length > 0) {
+        const inference = inferMoodFromText(combinedContext)
         detectedMood = inference.mood
         score = score ?? inference.score
         if (inference.emotions.length > 0) {
@@ -53,16 +98,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const sanitizedContext =
-      typeof context === "string" && context.length > 0 ? context.slice(-1000) : emotionsList.join(", ")
+    if (typeof inferredEnergy !== "number") {
+      inferredEnergy = 5
+    }
+
+    const uniqueEmotions = Array.from(new Set(emotionsList.filter((emotion) => emotion.trim().length > 0)))
+
+    const sanitizedContext = combinedContext.length > 0 ? combinedContext.slice(-2000) : uniqueEmotions.join(", ")
 
     // Generate recommendations
     const recommendations = await generateEmpathyRecommendations({
       moodScore: score,
       detectedMood: detectedMood as MoodCategory,
-      emotions: emotionsList,
-      energyLevel: energyLevel || 5,
+      emotions: uniqueEmotions,
+      energyLevel: inferredEnergy,
       context: sanitizedContext,
+      voiceTranscript: voiceInsights?.transcript,
+      imageMood: imageInsights?.moodLabel,
+      imageConfidence: imageInsights?.confidence,
     })
 
     return NextResponse.json(recommendations)

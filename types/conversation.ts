@@ -8,6 +8,10 @@ export interface MessageMetadata {
   audioUrl?: string
   photoUrl?: string
   energy?: number
+  transcript?: string
+  emotions?: string[]
+  summary?: string
+  confidence?: number
   [key: string]: unknown
 }
 

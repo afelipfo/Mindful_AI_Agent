@@ -16,7 +16,7 @@ export interface WellnessSnapshot {
   aiInsights: AIInsight[]
 }
 
-export function getDemoWellnessSnapshot(): WellnessSnapshot {
+export function getFallbackWellnessSnapshot(): WellnessSnapshot {
   return {
     moodEntries,
     triggerFrequency,

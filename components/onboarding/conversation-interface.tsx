@@ -79,12 +79,40 @@ export function ConversationInterface({
       })
 
       const audioUrl = await uploadAudio(audioBlob)
+      let metadata: MessageMetadata = { audioUrl }
+      let content = "Voice recording captured"
 
-      onSendMessage("Voice recording captured", "voice", { audioUrl })
+      try {
+        const analysisResponse = await fetch("/api/analyze/voice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audioUrl }),
+        })
+
+        if (analysisResponse.ok) {
+          const analysis = await analysisResponse.json()
+          content = analysis.transcript ? `Voice note: ${analysis.transcript}` : content
+          metadata = {
+            ...metadata,
+            transcript: analysis.transcript,
+            label: typeof analysis.moodLabel === "string" ? analysis.moodLabel.toLowerCase() : undefined,
+            value: analysis.moodScore,
+            energy: analysis.energyLevel,
+            emotions: analysis.emotions,
+            summary: analysis.summary,
+          }
+        } else {
+          console.error("Voice analysis failed", await analysisResponse.json().catch(() => ({})))
+        }
+      } catch (analysisError) {
+        console.error("Voice analysis error:", analysisError)
+      }
+
+      onSendMessage(content, "voice", metadata)
 
       toast({
-        title: "Audio uploaded",
-        description: "Your voice recording has been saved",
+        title: "Voice note ready",
+        description: "We transcribed your recording and added it to the conversation.",
       })
     } catch (error) {
       console.error("Failed to upload audio:", error)
@@ -115,12 +143,38 @@ export function ConversationInterface({
       })
 
       const photoUrl = await uploadImage(file)
+      let metadata: MessageMetadata = { photoUrl }
+      let content = "Photo captured"
 
-      onSendMessage("Photo captured", "photo", { photoUrl })
+      try {
+        const analysisResponse = await fetch("/api/analyze/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: photoUrl }),
+        })
+
+        if (analysisResponse.ok) {
+          const analysis = await analysisResponse.json()
+          content = analysis.summary ? analysis.summary : `Photo mood: ${analysis.moodLabel}`
+          metadata = {
+            ...metadata,
+            label: typeof analysis.moodLabel === "string" ? analysis.moodLabel.toLowerCase() : undefined,
+            confidence: analysis.confidence,
+            emotions: analysis.emotions,
+            summary: analysis.summary,
+          }
+        } else {
+          console.error("Image analysis failed", await analysisResponse.json().catch(() => ({})))
+        }
+      } catch (analysisError) {
+        console.error("Image analysis error:", analysisError)
+      }
+
+      onSendMessage(content, "photo", metadata)
 
       toast({
-        title: "Photo uploaded",
-        description: "Your photo has been saved",
+        title: "Photo analyzed",
+        description: "We added emotional cues from your snapshot.",
       })
     } catch (error) {
       console.error("Failed to upload photo:", error)
