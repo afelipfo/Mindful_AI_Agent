@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +8,6 @@ import { Card } from "@/components/ui/card"
 import { Brain, Loader2, Mail, CheckCircle } from "lucide-react"
 
 export default function SignUpPage() {
-  const router = useRouter()
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

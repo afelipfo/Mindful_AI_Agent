@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { signupSchema, emailSchema } from '@/lib/validations/auth'
+import { signupSchema } from '@/lib/validations/auth'
 import { ZodError } from 'zod'
 
 export async function POST(request: NextRequest) {
