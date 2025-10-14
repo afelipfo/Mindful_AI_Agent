@@ -51,6 +51,11 @@ export const authOptions: NextAuthOptions = {
             throw new Error(error?.message || "Invalid credentials")
           }
 
+          // Check if email is confirmed
+          if (!data.user.email_confirmed_at) {
+            throw new Error("Please confirm your email address before signing in. Check your inbox for the confirmation link.")
+          }
+
           const user = {
             id: data.user.id,
             email: data.user.email!,
