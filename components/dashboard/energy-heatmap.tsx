@@ -50,6 +50,8 @@ export function EnergyHeatmap({ data }: EnergyHeatmapProps) {
                   "aspect-square rounded-md transition-all duration-200 hover:scale-110 hover:ring-2 hover:ring-primary cursor-pointer",
                   getColor(energy),
                 )}
+                role="button"
+                aria-label={`${day} ${hour}: energy ${energy} out of 10`}
                 title={`${day} ${hour}: ${energy}/10`}
               />
             )

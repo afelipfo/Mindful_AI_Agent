@@ -18,7 +18,11 @@ import { format } from "date-fns"
 import { Progress } from "@/components/ui/progress"
 import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
 import type { EmpathyResponse } from "@/lib/empathy-agent"
-import type { MoodEntry, WellnessSnapshot } from "@/types/wellness"
+import type { AIInsight, MoodEntry, WellnessSnapshot } from "@/types/wellness"
+import { useToast } from "@/components/ui/use-toast"
+import { GoalManager } from "@/components/dashboard/goal-manager"
+import { MoodEntryHistory } from "@/components/dashboard/mood-entry-history"
+import { aggregateEnergyByEntries } from "@/lib/analytics"
 
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamicImport(
@@ -132,14 +136,6 @@ const stepTitles = [
 
 const WINDOW_DAYS = 7
 
-const ENERGY_BUCKETS = [
-  { label: "Morning", startHour: 5, endHour: 11, representativeHour: 8 },
-  { label: "Afternoon", startHour: 12, endHour: 17, representativeHour: 14 },
-  { label: "Evening", startHour: 18, endHour: 23, representativeHour: 20 },
-] as const
-
-const DAY_ABBREVIATIONS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
-
 type TrendData = {
   direction: "up" | "down"
   value: string
@@ -197,42 +193,7 @@ const computeStreak = (entries: MoodEntry[]) => {
   return streak
 }
 
-const computeEnergyHeatmapData = (entries: MoodEntry[]) => {
-  const totals = new Map<string, { day: string; hour: number; sum: number; count: number }>()
-
-  entries.forEach((entry) => {
-    if (typeof entry.energy !== "number") return
-
-    const timestamp = entry.createdAt ? new Date(entry.createdAt) : new Date(entry.date)
-    if (Number.isNaN(timestamp.getTime())) return
-
-    let hour = timestamp.getHours()
-    if (Number.isNaN(hour)) {
-      hour = 12
-    }
-
-    let bucket =
-      ENERGY_BUCKETS.find((slot) => hour >= slot.startHour && hour <= slot.endHour) ?? null
-
-    if (!bucket) {
-      bucket = hour < ENERGY_BUCKETS[0].startHour ? ENERGY_BUCKETS[0] : ENERGY_BUCKETS[ENERGY_BUCKETS.length - 1]
-    }
-
-    const day = DAY_ABBREVIATIONS[timestamp.getDay()]
-    const key = `${day}-${bucket.label}`
-    const current = totals.get(key) ?? { day, hour: bucket.representativeHour, sum: 0, count: 0 }
-
-    current.sum += entry.energy
-    current.count += 1
-    totals.set(key, current)
-  })
-
-  return Array.from(totals.values()).map(({ day, hour, sum, count }) => ({
-    day,
-    hour,
-    energy: Number((sum / Math.max(count, 1)).toFixed(1)),
-  }))
-}
+const computeEnergyHeatmapData = (entries: MoodEntry[]) => aggregateEnergyByEntries(entries)
 
 export default function OnboardingPage() {
   const { status } = useSession()
@@ -253,6 +214,7 @@ export default function OnboardingPage() {
       status: index === 0 ? "active" : "upcoming",
     })),
   )
+  const { toast } = useToast()
 
   const {
     moodEntries,
@@ -260,6 +222,7 @@ export default function OnboardingPage() {
     copingEffectiveness,
     wellnessGoals,
     aiInsights,
+    energyBuckets,
   } = snapshot
 
   const sortedMoodEntries = useMemo(
@@ -309,7 +272,13 @@ export default function OnboardingPage() {
   const streakDays = computeStreak(sortedMoodEntries)
   const streakDisplay = streakDays > 0 ? `${streakDays} ${streakDays === 1 ? "day" : "days"}` : "No streak yet"
 
-  const energyHeatmapData = useMemo(() => computeEnergyHeatmapData(sortedMoodEntries), [sortedMoodEntries])
+  const serverEnergyBuckets = useMemo(() => energyBuckets ?? [], [energyBuckets])
+  const energyHeatmapData = useMemo(() => {
+    if (serverEnergyBuckets.length > 0) {
+      return serverEnergyBuckets
+    }
+    return computeEnergyHeatmapData(sortedMoodEntries)
+  }, [serverEnergyBuckets, sortedMoodEntries])
   const hasEnergyData = energyHeatmapData.length > 0
 
   const loadSnapshot = useCallback(async () => {
@@ -328,6 +297,50 @@ export default function OnboardingPage() {
       setIsSnapshotLoading(false)
     }
   }, [])
+
+  const markInsightAsRead = useCallback(
+    async (insightId: string) => {
+      try {
+        const response = await fetch(`/api/ai-insights/${insightId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isRead: true }),
+        })
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}))
+          throw new Error(body.error || "Failed to update insight")
+        }
+
+        setSnapshot((prev) => ({
+          ...prev,
+          aiInsights: prev.aiInsights.map((insight) =>
+            insight.id === insightId ? { ...insight, isRead: true } : insight,
+          ),
+        }))
+
+        toast({
+          title: "Insight saved",
+          description: "We'll remember that you've reviewed this insight.",
+        })
+      } catch (error) {
+        console.error("[mindful-ai] Failed to mark insight read", error)
+        toast({
+          title: "Unable to update insight",
+          description: "Please try again in a moment.",
+        })
+      }
+    },
+    [toast],
+  )
+
+  const handleDismissInsight = useCallback(
+    async (insight: AIInsight) => {
+      if (!insight.id || insight.isRead) return
+      await markInsightAsRead(insight.id)
+    },
+    [markInsightAsRead],
+  )
 
   const persistCheckIn = useCallback(
     async (conversation: ConversationMessage[], payload: EmpathyRequestPayload, empathy: EmpathyResponse) => {
@@ -365,6 +378,8 @@ export default function OnboardingPage() {
             note: truncatedNote,
             audioUrl,
             photoUrl,
+            date: new Date().toISOString().slice(0, 10),
+            timestamp: new Date().toISOString(),
           },
           summary: {
             analysisSummary: empathy.analysisSummary,
@@ -761,11 +776,14 @@ export default function OnboardingPage() {
                   </div>
 
                   <Card className="p-6 mb-8">
-                    <h2 className="text-lg font-semibold mb-4">Wellness Goals</h2>
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <h2 className="text-lg font-semibold">Wellness Goals</h2>
+                      <GoalManager goals={wellnessGoals} onRefresh={loadSnapshot} />
+                    </div>
                     {wellnessGoals.length > 0 ? (
                       <div className="space-y-6">
                         {wellnessGoals.map((goal) => (
-                          <div key={goal.goal}>
+                          <div key={goal.id ?? goal.goal}>
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium">{goal.goal}</span>
                               <span className="text-sm text-text-muted">
@@ -812,6 +830,16 @@ export default function OnboardingPage() {
                         Once you log coping strategies, we&apos;ll analyze what helps you most.
                       </div>
                     )}
+                  </Card>
+
+                  <Card className="p-6 mb-12">
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <h2 className="text-lg font-semibold">Recent Check-Ins</h2>
+                      <span className="text-xs text-text-muted">
+                        Last {Math.min(sortedMoodEntries.length, 10)} entries
+                      </span>
+                    </div>
+                    <MoodEntryHistory entries={sortedMoodEntries} onRefresh={loadSnapshot} />
                   </Card>
                 </div>
               </TabsContent>
@@ -890,13 +918,23 @@ export default function OnboardingPage() {
 
                     <TabsContent value="all" className="space-y-4">
                       {aiInsights.map((insight, index) => (
-                        <InsightCard key={index} insight={insight} />
+                        <InsightCard
+                          key={insight.id ?? index}
+                          insight={insight}
+                          onDismiss={handleDismissInsight}
+                        />
                       ))}
                     </TabsContent>
 
                     <TabsContent value="patterns" className="space-y-4">
                       {patterns.length > 0 ? (
-                        patterns.map((insight, index) => <InsightCard key={index} insight={insight} />)
+                        patterns.map((insight, index) => (
+                          <InsightCard
+                            key={insight.id ?? index}
+                            insight={insight}
+                            onDismiss={handleDismissInsight}
+                          />
+                        ))
                       ) : (
                         <Card className="p-8 text-center">
                           <Brain className="h-12 w-12 text-text-muted mx-auto mb-4" />
@@ -907,7 +945,13 @@ export default function OnboardingPage() {
 
                     <TabsContent value="recommendations" className="space-y-4">
                       {recommendations.length > 0 ? (
-                        recommendations.map((insight, index) => <InsightCard key={index} insight={insight} />)
+                        recommendations.map((insight, index) => (
+                          <InsightCard
+                            key={insight.id ?? index}
+                            insight={insight}
+                            onDismiss={handleDismissInsight}
+                          />
+                        ))
                       ) : (
                         <Card className="p-8 text-center">
                           <TrendingUp className="h-12 w-12 text-text-muted mx-auto mb-4" />
@@ -918,7 +962,13 @@ export default function OnboardingPage() {
 
                     <TabsContent value="alerts" className="space-y-4">
                       {alerts.length > 0 ? (
-                        alerts.map((insight, index) => <InsightCard key={index} insight={insight} />)
+                        alerts.map((insight, index) => (
+                          <InsightCard
+                            key={insight.id ?? index}
+                            insight={insight}
+                            onDismiss={handleDismissInsight}
+                          />
+                        ))
                       ) : (
                         <Card className="p-8 text-center">
                           <AlertTriangle className="h-12 w-12 text-text-muted mx-auto mb-4" />

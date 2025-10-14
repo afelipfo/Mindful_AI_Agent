@@ -34,6 +34,8 @@ const moodEntrySchema = z.object({
   note: z.string().optional(),
   audioUrl: z.string().url().optional(),
   photoUrl: z.string().url().optional(),
+  date: z.string().optional(),
+  timestamp: z.string().optional(),
 })
 
 const summarySchema = z
@@ -67,63 +69,26 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id
     const supabase = createAdminClient()
-
     const filteredResponses = payload.responses.filter((response) => response.response.trim().length > 0)
 
-    if (filteredResponses.length > 0) {
-      const { error: responsesError } = await supabase.from("onboarding_responses").insert(
-        filteredResponses.map((response) => ({
-          user_id: userId,
-          step: response.step,
-          step_title: response.stepTitle,
-          response: response.response,
-          metadata: response.metadata ?? null,
-        })),
-      )
-
-      if (responsesError) {
-        throw responsesError
-      }
-    }
-
-    const {
-      moodScore,
-      energyLevel,
-      emotions,
-      triggers,
-      coping,
-      entryType,
-      note,
-      audioUrl,
-      photoUrl,
-    } = payload.moodEntry
-
-    const { error: moodError } = await supabase.from("mood_entries").insert({
-      user_id: userId,
-      date: new Date().toISOString().slice(0, 10),
-      mood_score: Math.round(moodScore),
-      energy_level: Math.round(energyLevel),
-      emotions,
-      triggers,
-      coping_strategies: coping,
-      entry_type: entryType === "voice" || entryType === "emoji" || entryType === "photo" ? entryType : "text",
-      note: note ?? null,
-      audio_url: audioUrl ?? null,
-      photo_url: photoUrl ?? null,
+    const { error: rpcError } = await supabase.rpc("process_onboarding_check_in", {
+      p_user_id: userId,
+      p_responses: filteredResponses,
+      p_mood_entry: {
+        ...payload.moodEntry,
+        entryType:
+          payload.moodEntry.entryType === "voice" ||
+          payload.moodEntry.entryType === "emoji" ||
+          payload.moodEntry.entryType === "photo"
+            ? payload.moodEntry.entryType
+            : "text",
+        timestamp: new Date().toISOString(),
+      },
+      p_summary: payload.summary ?? null,
     })
 
-    if (moodError) {
-      throw moodError
-    }
-
-    if (payload.summary?.analysisSummary) {
-      await supabase.from("ai_insights").insert({
-        user_id: userId,
-        insight_type: "recommendation",
-        title: `Mood insight${payload.summary.detectedMood ? `: ${payload.summary.detectedMood}` : ""}`,
-        description: payload.summary.analysisSummary,
-        action: "Review recommendations",
-      })
+    if (rpcError) {
+      throw rpcError
     }
 
     return NextResponse.json({ success: true })

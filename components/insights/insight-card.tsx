@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo } from "react"
+import { useState, memo, useTransition } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
@@ -9,10 +9,12 @@ import type { AIInsight } from "@/types/wellness"
 
 interface InsightCardProps {
   insight: AIInsight
+  onDismiss?: (insight: AIInsight) => Promise<void> | void
 }
 
-export const InsightCard = memo(function InsightCard({ insight }: InsightCardProps) {
+export const InsightCard = memo(function InsightCard({ insight, onDismiss }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
   const getIcon = () => {
     switch (insight.type) {
@@ -73,12 +75,22 @@ export const InsightCard = memo(function InsightCard({ insight }: InsightCardPro
             )}
             <div className="mt-4 flex gap-2">
               {insight.action && (
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" disabled={isPending}>
                   {insight.action}
                 </Button>
               )}
-              <Button size="sm" variant="ghost">
-                Dismiss
+              <Button
+                size="sm"
+                variant={insight.isRead ? "secondary" : "ghost"}
+                disabled={isPending || insight.isRead}
+                onClick={() => {
+                  if (!onDismiss || insight.isRead) return
+                  startTransition(async () => {
+                    await onDismiss(insight)
+                  })
+                }}
+              >
+                {insight.isRead ? "Done" : "Dismiss"}
               </Button>
             </div>
           </div>

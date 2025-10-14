@@ -5,6 +5,12 @@ import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { WellnessSnapshot } from "@/types/wellness"
+import {
+  DAY_LABELS,
+  aggregateEnergyByEntries,
+  normalizeCopingEffectiveness,
+  normalizeTriggerFrequency,
+} from "@/lib/analytics"
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +28,14 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id
     const supabase = createAdminClient()
 
-    const [{ data: moodEntriesData }, { data: wellnessGoalsData }, { data: insightsData }] = await Promise.all([
+    const [
+      { data: moodEntriesData },
+      { data: wellnessGoalsData },
+      { data: insightsData },
+      { data: triggerFrequencyData },
+      { data: copingStatsData },
+      { data: energyStatsData },
+    ] = await Promise.all([
       supabase
         .from("mood_entries")
         .select(
@@ -33,15 +46,27 @@ export async function GET(request: NextRequest) {
         .limit(60),
       supabase
         .from("wellness_goals")
-        .select("goal, target_value, current_value, unit, progress, is_active")
+        .select("id, goal, target_value, current_value, unit, progress, is_active")
         .eq("user_id", userId)
         .eq("is_active", true),
       supabase
         .from("ai_insights")
-        .select("insight_type, title, description, action")
+        .select("id, insight_type, title, description, action, is_read")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(20),
+      supabase
+        .from("user_trigger_frequency")
+        .select("trigger, occurrences")
+        .eq("user_id", userId),
+      supabase
+        .from("user_coping_effectiveness")
+        .select("strategy, average_mood")
+        .eq("user_id", userId),
+      supabase
+        .from("user_energy_by_hour")
+        .select("entry_hour, entry_date, avg_energy")
+        .eq("user_id", userId),
     ])
 
     const mappedMoodEntries =
@@ -63,47 +88,91 @@ export async function GET(request: NextRequest) {
         createdAt: entry.created_at ?? undefined,
       })) ?? []
 
-    const triggerFrequency: Record<string, number> = {}
-    mappedMoodEntries.forEach((entry) => {
-      entry.triggers.forEach((trigger) => {
-        const key = trigger.trim()
-        if (!key) return
-        triggerFrequency[key] = (triggerFrequency[key] ?? 0) + 1
-      })
-    })
-
-    const copingTotals: Record<string, { sum: number; count: number }> = {}
-    mappedMoodEntries.forEach((entry) => {
-      if (!entry.coping || entry.coping.length === 0) return
-      entry.coping.forEach((strategy) => {
-        const key = strategy.trim()
-        if (!key) return
-        if (!copingTotals[key]) {
-          copingTotals[key] = { sum: 0, count: 0 }
+    const triggerFrequencyFromView: Record<string, number> =
+      triggerFrequencyData?.reduce<Record<string, number>>((acc, row) => {
+        if (!row || typeof row.trigger !== "string") {
+          return acc
         }
-        copingTotals[key].sum += entry.mood
-        copingTotals[key].count += 1
-      })
+        acc[row.trigger] = Number(row.occurrences ?? 0)
+        return acc
+      }, {}) ?? {}
+
+    const fallbackTriggerFrequency = normalizeTriggerFrequency(mappedMoodEntries)
+
+    const triggerFrequency = Object.keys(triggerFrequencyFromView).length
+      ? triggerFrequencyFromView
+      : fallbackTriggerFrequency
+
+    const copingEffectivenessFromView: Record<string, number> =
+      copingStatsData?.reduce<Record<string, number>>((acc, row) => {
+        if (!row || typeof row.strategy !== "string") {
+          return acc
+        }
+        const value = Number(row.average_mood ?? 0)
+        if (!Number.isNaN(value)) {
+          acc[row.strategy] = value
+        }
+        return acc
+      }, {}) ?? {}
+
+    const fallbackCopingEffectiveness = normalizeCopingEffectiveness(mappedMoodEntries)
+
+    const copingEffectiveness = Object.keys(copingEffectivenessFromView).length
+      ? copingEffectivenessFromView
+      : fallbackCopingEffectiveness
+
+    const energyBucketAccumulator = new Map<
+      string,
+      { day: string; hour: number; total: number; count: number }
+    >()
+
+    energyStatsData?.forEach((row) => {
+      if (!row) return
+      const entryDate = typeof row.entry_date === "string" ? row.entry_date : null
+      const energy = Number(row.avg_energy ?? 0)
+      const hourValue = typeof row.entry_hour === "number" ? row.entry_hour : Number(row.entry_hour)
+      if (!entryDate || Number.isNaN(energy) || Number.isNaN(hourValue)) return
+
+      const parsedDate = new Date(`${entryDate}T00:00:00Z`)
+      if (Number.isNaN(parsedDate.getTime())) return
+      const day = DAY_LABELS[parsedDate.getUTCDay()]
+      let representativeHour = 20
+      if (hourValue >= 5 && hourValue <= 11) {
+        representativeHour = 8
+      } else if (hourValue >= 12 && hourValue <= 17) {
+        representativeHour = 14
+      }
+
+      const key = `${day}-${representativeHour}`
+      const existing = energyBucketAccumulator.get(key) ?? { day, hour: representativeHour, total: 0, count: 0 }
+      existing.total += energy
+      existing.count += 1
+      energyBucketAccumulator.set(key, existing)
     })
 
-    const copingEffectiveness = Object.fromEntries(
-      Object.entries(copingTotals).map(([strategy, stats]) => [
-        strategy,
-        Number((stats.sum / Math.max(stats.count, 1)).toFixed(1)),
-      ]),
-    )
+    let energyBuckets = Array.from(energyBucketAccumulator.values()).map((bucket) => ({
+      day: bucket.day,
+      hour: bucket.hour,
+      energy: Number((bucket.total / Math.max(bucket.count, 1)).toFixed(1)),
+    }))
+
+    if (energyBuckets.length === 0 && mappedMoodEntries.length > 0) {
+      energyBuckets = aggregateEnergyByEntries(mappedMoodEntries)
+    }
 
     const mappedGoals =
       wellnessGoalsData?.map((goal) => ({
+        id: goal.id ?? randomUUID(),
         goal: goal.goal,
         target: Number(goal.target_value ?? 0),
         current: Number(goal.current_value ?? 0),
         unit: goal.unit ?? "",
-        progress: goal.progress ?? 0,
+        progress: Number(goal.progress ?? 0),
       })) ?? []
 
     const mappedInsights =
       insightsData?.map((insight) => ({
+        id: insight.id ?? randomUUID(),
         type:
           insight.insight_type === "alert" || insight.insight_type === "pattern"
             ? insight.insight_type
@@ -111,6 +180,7 @@ export async function GET(request: NextRequest) {
         title: insight.title ?? "Insight",
         description: insight.description ?? "",
         action: insight.action ?? undefined,
+        isRead: Boolean(insight.is_read),
       })) ?? []
 
     const response: WellnessSnapshot = {
@@ -119,6 +189,7 @@ export async function GET(request: NextRequest) {
       copingEffectiveness,
       wellnessGoals: mappedGoals,
       aiInsights: mappedInsights,
+      energyBuckets,
     }
 
     return NextResponse.json(response, {

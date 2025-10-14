@@ -15,6 +15,7 @@ An AI-powered mental wellness companion that tracks emotional states through mul
 - **Wellness Dashboard**: Visualize mood trends, energy patterns, and triggers
 - **AI Insights**: Get personalized recommendations based on your patterns
 - **Goal Tracking**: Monitor progress toward your wellness objectives
+- **Goal & History Management**: Update goals, archive finished milestones, and edit or remove past check-ins
 
 ## Tech Stack
 
@@ -68,7 +69,14 @@ SPOTIFY_CLIENT_SECRET=your_client_secret
 FOURSQUARE_API_KEY=your_api_key
 \`\`\`
 
-**Note**: Open Library and Quotable APIs require no authentication. The app will use fallback recommendations if API keys are missing.
+**Note**: Open Library and Quotable APIs require no authentication. The app will use fallback recommendations if API keys are missing. Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only (it never ships to the browser).
+
+### Quality checks
+
+- `pnpm lint`
+- `pnpm test`
+
+The test suite compiles the shared analytics helpers and exercises trigger, coping, and energy bucketing logic via Node's built-in test runner.
 
 ### Quick verification
 

@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test": "pnpm exec tsc --project tsconfig.test.json && node --test .tmp-tests/tests/analytics.test.js && rm -rf .tmp-tests"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.0",

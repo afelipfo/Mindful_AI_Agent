@@ -6,6 +6,7 @@ export const EMPTY_WELLNESS_SNAPSHOT: WellnessSnapshot = {
   copingEffectiveness: {},
   wellnessGoals: [],
   aiInsights: [],
+  energyBuckets: [],
 }
 
 export function getEmptyWellnessSnapshot(): WellnessSnapshot {
@@ -15,6 +16,6 @@ export function getEmptyWellnessSnapshot(): WellnessSnapshot {
     copingEffectiveness: {},
     wellnessGoals: [],
     aiInsights: [],
+    energyBuckets: [],
   }
 }
-

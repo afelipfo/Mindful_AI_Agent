@@ -12,6 +12,7 @@ node_modules/
 
 # Production
 /build
+.tmp-tests/
 
 # Misc
 .DS_Store

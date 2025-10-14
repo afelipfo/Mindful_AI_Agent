@@ -16,6 +16,7 @@ export interface MoodEntry {
 }
 
 export interface WellnessGoal {
+  id?: string
   goal: string
   target: number
   current: number
@@ -26,10 +27,18 @@ export interface WellnessGoal {
 export type AIInsightType = "pattern" | "recommendation" | "alert"
 
 export interface AIInsight {
+  id?: string
   type: AIInsightType
   title: string
   description: string
   action?: string
+  isRead?: boolean
+}
+
+export interface EnergyBucket {
+  day: string
+  hour: number
+  energy: number
 }
 
 export interface WellnessSnapshot {
@@ -38,4 +47,5 @@ export interface WellnessSnapshot {
   copingEffectiveness: Record<string, number>
   wellnessGoals: WellnessGoal[]
   aiInsights: AIInsight[]
+  energyBuckets: EnergyBucket[]
 }
