@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import dynamic from "next/dynamic"
+import dynamicImport from "next/dynamic"
 import { ProgressSidebar } from "@/components/onboarding/progress-sidebar"
 import { ConversationInterface } from "@/components/onboarding/conversation-interface"
 import { Button } from "@/components/ui/button"
@@ -24,37 +24,37 @@ import type { WellnessSnapshot } from "@/lib/wellness-data"
 export const dynamic = 'force-dynamic'
 
 // Dynamically import heavy components
-const EmpathyRecommendations = dynamic(
+const EmpathyRecommendations = dynamicImport(
   () => import("@/components/check-in/empathy-recommendations").then(mod => ({ default: mod.EmpathyRecommendations })),
   { ssr: false, loading: () => <div className="flex items-center justify-center p-8">Loading...</div> }
 )
 
-const MetricCard = dynamic(
+const MetricCard = dynamicImport(
   () => import("@/components/dashboard/metric-card").then(mod => ({ default: mod.MetricCard })),
   { ssr: false }
 )
 
-const MoodTrendChart = dynamic(
+const MoodTrendChart = dynamicImport(
   () => import("@/components/dashboard/mood-trend-chart").then(mod => ({ default: mod.MoodTrendChart })),
   { ssr: false, loading: () => <div className="h-[300px] animate-pulse bg-muted rounded-lg" /> }
 )
 
-const TriggerCloud = dynamic(
+const TriggerCloud = dynamicImport(
   () => import("@/components/dashboard/trigger-cloud").then(mod => ({ default: mod.TriggerCloud })),
   { ssr: false, loading: () => <div className="h-[300px] animate-pulse bg-muted rounded-lg" /> }
 )
 
-const WellbeingScore = dynamic(
+const WellbeingScore = dynamicImport(
   () => import("@/components/dashboard/wellbeing-score").then(mod => ({ default: mod.WellbeingScore })),
   { ssr: false }
 )
 
-const EnergyHeatmap = dynamic(
+const EnergyHeatmap = dynamicImport(
   () => import("@/components/dashboard/energy-heatmap").then(mod => ({ default: mod.EnergyHeatmap })),
   { ssr: false, loading: () => <div className="h-[200px] animate-pulse bg-muted rounded-lg" /> }
 )
 
-const InsightCard = dynamic(
+const InsightCard = dynamicImport(
   () => import("@/components/insights/insight-card").then(mod => ({ default: mod.InsightCard })),
   { ssr: false }
 )
