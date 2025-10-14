@@ -4,6 +4,8 @@ interface FoursquarePlace {
   name?: string
   location?: {
     formatted_address?: string
+    lat?: number
+    lng?: number
   }
 }
 
@@ -85,6 +87,9 @@ export async function POST(request: NextRequest) {
             reason: placeData.reason,
             benefits: placeData.benefits,
             address: place.location?.formatted_address,
+            coordinates: place.location?.lat && place.location?.lng
+              ? { lat: place.location.lat, lng: place.location.lng }
+              : undefined,
           })
         }
       }

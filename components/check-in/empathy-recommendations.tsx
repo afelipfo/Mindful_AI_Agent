@@ -249,7 +249,19 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
               <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
             </a>
 
-            <div className="group relative rounded-lg border border-border bg-background p-4 transition hover:border-primary/40 hover:shadow-md sm:col-span-2 lg:col-span-1">
+            <a
+              href={
+                recommendation.place.coordinates
+                  ? `https://www.google.com/maps/search/?api=1&query=${recommendation.place.coordinates.lat},${recommendation.place.coordinates.lng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      recommendation.place.address || recommendation.place.type
+                    )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative block rounded-lg border border-border bg-background p-4 transition hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:col-span-2 lg:col-span-1"
+              aria-label={`Find ${recommendation.place.type} on Google Maps`}
+            >
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
                 <MapPin className="h-5 w-5 text-white" aria-hidden="true" />
               </div>
@@ -258,11 +270,12 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
                 {recommendation.place.type}
               </h4>
               <p className="mb-1 text-xs text-text-secondary">{recommendation.place.reason}</p>
-              <p className="line-clamp-3 text-xs leading-snug text-text-secondary">{recommendation.place.benefits}</p>
+              <p className="text-xs leading-snug text-text-secondary">{recommendation.place.benefits}</p>
               {recommendation.place.address && (
                 <p className="mt-2 text-xs text-text-muted">{recommendation.place.address}</p>
               )}
-            </div>
+              <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+            </a>
           </div>
         </div>
 
