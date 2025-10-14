@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import dynamicImport from "next/dynamic"
@@ -13,12 +13,12 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
-import { getFallbackWellnessSnapshot } from "@/lib/wellness-data"
+import { getEmptyWellnessSnapshot } from "@/lib/wellness-data"
 import { format } from "date-fns"
 import { Progress } from "@/components/ui/progress"
 import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
 import type { EmpathyResponse } from "@/lib/empathy-agent"
-import type { WellnessSnapshot } from "@/lib/wellness-data"
+import type { MoodEntry, WellnessSnapshot } from "@/types/wellness"
 
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamicImport(
@@ -88,14 +88,6 @@ interface EmpathyRequestPayload {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
-const EMPTY_SNAPSHOT: WellnessSnapshot = {
-  moodEntries: [],
-  triggerFrequency: {},
-  copingEffectiveness: {},
-  wellnessGoals: [],
-  aiInsights: [],
-}
-
 const onboardingQuestions = [
   {
     question:
@@ -138,6 +130,104 @@ const stepTitles = [
   "Preferences",
 ]
 
+const WINDOW_DAYS = 7
+
+const ENERGY_BUCKETS = [
+  { label: "Morning", startHour: 5, endHour: 11, representativeHour: 8 },
+  { label: "Afternoon", startHour: 12, endHour: 17, representativeHour: 14 },
+  { label: "Evening", startHour: 18, endHour: 23, representativeHour: 20 },
+] as const
+
+const DAY_ABBREVIATIONS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
+
+const computeAverage = (entries: MoodEntry[], key: "mood" | "energy") => {
+  if (!entries.length) return 0
+  const total = entries.reduce((sum, entry) => sum + entry[key], 0)
+  return total / entries.length
+}
+
+const buildTrend = (diff: number | null, decimals = 1) => {
+  if (diff === null) return undefined
+  if (!Number.isFinite(diff)) return undefined
+  const rounded = Number(diff.toFixed(decimals))
+  if (rounded === 0) {
+    return {
+      direction: "up" as const,
+      value: "0",
+      isPositive: true,
+    }
+  }
+  const isPositive = rounded > 0
+  return {
+    direction: isPositive ? "up" : ("down" as const),
+    value: `${isPositive ? "+" : ""}${rounded.toFixed(decimals)}`,
+    isPositive,
+  }
+}
+
+const computeStreak = (entries: MoodEntry[]) => {
+  if (!entries.length) return 0
+  const uniqueDates = Array.from(
+    new Set(
+      entries
+        .map((entry) => entry.date)
+        .filter((date): date is string => Boolean(date)),
+    ),
+  ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+
+  if (!uniqueDates.length) return 0
+
+  let streak = 1
+  for (let index = 1; index < uniqueDates.length; index++) {
+    const previousDate = new Date(uniqueDates[index - 1])
+    const currentDate = new Date(uniqueDates[index])
+    const diffDays = Math.round((previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 1) {
+      streak += 1
+    } else {
+      break
+    }
+  }
+  return streak
+}
+
+const computeEnergyHeatmapData = (entries: MoodEntry[]) => {
+  const totals = new Map<string, { day: string; hour: number; sum: number; count: number }>()
+
+  entries.forEach((entry) => {
+    if (typeof entry.energy !== "number") return
+
+    const timestamp = entry.createdAt ? new Date(entry.createdAt) : new Date(entry.date)
+    if (Number.isNaN(timestamp.getTime())) return
+
+    let hour = timestamp.getHours()
+    if (Number.isNaN(hour)) {
+      hour = 12
+    }
+
+    let bucket =
+      ENERGY_BUCKETS.find((slot) => hour >= slot.startHour && hour <= slot.endHour) ?? null
+
+    if (!bucket) {
+      bucket = hour < ENERGY_BUCKETS[0].startHour ? ENERGY_BUCKETS[0] : ENERGY_BUCKETS[ENERGY_BUCKETS.length - 1]
+    }
+
+    const day = DAY_ABBREVIATIONS[timestamp.getDay()]
+    const key = `${day}-${bucket.label}`
+    const current = totals.get(key) ?? { day, hour: bucket.representativeHour, sum: 0, count: 0 }
+
+    current.sum += entry.energy
+    current.count += 1
+    totals.set(key, current)
+  })
+
+  return Array.from(totals.values()).map(({ day, hour, sum, count }) => ({
+    day,
+    hour,
+    energy: Number((sum / Math.max(count, 1)).toFixed(1)),
+  }))
+}
+
 export default function OnboardingPage() {
   const { status } = useSession()
   const router = useRouter()
@@ -148,7 +238,7 @@ export default function OnboardingPage() {
   const [isCompleted, setIsCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState("empathy")
   const [responsesByStep, setResponsesByStep] = useState<Record<number, ConversationMessage>>({})
-  const [snapshot, setSnapshot] = useState<WellnessSnapshot>(EMPTY_SNAPSHOT)
+  const [snapshot, setSnapshot] = useState<WellnessSnapshot>(getEmptyWellnessSnapshot())
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
   const [steps, setSteps] = useState<Step[]>(
     stepTitles.map((title, index) => ({
@@ -166,26 +256,55 @@ export default function OnboardingPage() {
     aiInsights,
   } = snapshot
 
-  const recentEntries = moodEntries.slice(0, 7)
-  const avgMood = recentEntries.length
-    ? (recentEntries.reduce((sum, entry) => sum + entry.mood, 0) / recentEntries.length).toFixed(1)
-    : "0.0"
-  const avgEnergy = recentEntries.length
-    ? (recentEntries.reduce((sum, entry) => sum + entry.energy, 0) / recentEntries.length).toFixed(1)
-    : "0.0"
-  const wellbeingScore = recentEntries.length
-    ? Math.min(
-        100,
-        Math.max(
-          30,
+  const sortedMoodEntries = useMemo(
+    () =>
+      [...moodEntries].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
+    [moodEntries],
+  )
+
+  const currentWindow = sortedMoodEntries.slice(0, WINDOW_DAYS)
+  const previousWindow = sortedMoodEntries.slice(WINDOW_DAYS, WINDOW_DAYS * 2)
+
+  const averageMoodCurrent = computeAverage(currentWindow, "mood")
+  const averageEnergyCurrent = computeAverage(currentWindow, "energy")
+  const averageMoodPrevious = previousWindow.length ? computeAverage(previousWindow, "mood") : 0
+  const averageEnergyPrevious = previousWindow.length ? computeAverage(previousWindow, "energy") : 0
+
+  const moodTrendDiff = previousWindow.length ? averageMoodCurrent - averageMoodPrevious : null
+  const energyTrendDiff = previousWindow.length ? averageEnergyCurrent - averageEnergyPrevious : null
+  const checkInTrendDiff = previousWindow.length ? currentWindow.length - previousWindow.length : null
+
+  const moodTrend = buildTrend(moodTrendDiff)
+  const energyTrend = buildTrend(energyTrendDiff)
+  const checkInTrend = buildTrend(checkInTrendDiff, 0)
+
+  const hasMoodData = currentWindow.length > 0
+
+  const averageMoodDisplay = hasMoodData ? `${averageMoodCurrent.toFixed(1)}/10` : "—"
+  const averageEnergyDisplay = hasMoodData ? `${averageEnergyCurrent.toFixed(1)}/10` : "—"
+  const checkInsCurrent = currentWindow.length
+
+  const wellbeingScore = hasMoodData
+    ? Math.max(
+        0,
+        Math.min(
+          100,
           Math.round(
-            (recentEntries.reduce((sum, entry) => sum + entry.mood + entry.energy, 0) /
-              (recentEntries.length * 20)) *
+            (currentWindow.reduce((sum, entry) => sum + entry.mood + entry.energy, 0) /
+              (currentWindow.length * 20)) *
               100,
           ),
         ),
       )
-    : 70
+    : 0
+
+  const streakDays = computeStreak(sortedMoodEntries)
+  const streakDisplay = streakDays > 0 ? `${streakDays} ${streakDays === 1 ? "day" : "days"}` : "No streak yet"
+
+  const energyHeatmapData = useMemo(() => computeEnergyHeatmapData(sortedMoodEntries), [sortedMoodEntries])
+  const hasEnergyData = energyHeatmapData.length > 0
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -198,7 +317,7 @@ export default function OnboardingPage() {
       setSnapshot(data)
     } catch (error) {
       console.error("[mindful-ai] Failed to load wellness snapshot:", error)
-      setSnapshot((prev) => (prev.moodEntries.length ? prev : getFallbackWellnessSnapshot()))
+      setSnapshot((prev) => (prev.moodEntries.length ? prev : getEmptyWellnessSnapshot()))
     } finally {
       setIsSnapshotLoading(false)
     }
@@ -590,28 +709,27 @@ export default function OnboardingPage() {
 
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
                     <MetricCard
-                      title="Average Mood"
-                      value={`${avgMood}/10`}
+                      title="Average Mood (7d)"
+                      value={averageMoodDisplay}
                       icon={<Heart className="h-5 w-5" />}
-                      trend={{ direction: "up", value: "+0.8", isPositive: true }}
+                      trend={moodTrend}
                     />
                     <MetricCard
-                      title="Average Energy"
-                      value={`${avgEnergy}/10`}
+                      title="Average Energy (7d)"
+                      value={averageEnergyDisplay}
                       icon={<Zap className="h-5 w-5" />}
-                      trend={{ direction: "up", value: "+0.5", isPositive: true }}
+                      trend={energyTrend}
                     />
                     <MetricCard
-                      title="Check-Ins"
-                      value={moodEntries.length}
+                      title="7-Day Check-Ins"
+                      value={checkInsCurrent}
                       icon={<Brain className="h-5 w-5" />}
-                      trend={{ direction: "up", value: "+3", isPositive: true }}
+                      trend={checkInTrend}
                     />
                     <MetricCard
                       title="Streak"
-                      value="7 days"
+                      value={streakDisplay}
                       icon={<TrendingUp className="h-5 w-5" />}
-                      trend={{ direction: "up", value: "+2", isPositive: true }}
                     />
                   </div>
 
@@ -619,12 +737,24 @@ export default function OnboardingPage() {
                     <Card className="lg:col-span-2 p-6">
                       <h2 className="text-lg font-semibold mb-4">Mood & Energy Trends</h2>
                       <p className="text-sm text-text-secondary mb-4">Last 30 days</p>
-                      <MoodTrendChart data={moodEntries} />
+                      {hasMoodData ? (
+                        <MoodTrendChart data={sortedMoodEntries} />
+                      ) : (
+                        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
+                          Log a few check-ins to unlock your personalized trends.
+                        </div>
+                      )}
                     </Card>
 
                     <Card className="p-6">
                       <h2 className="text-lg font-semibold mb-4">Wellbeing Score</h2>
-                      <WellbeingScore score={wellbeingScore} />
+                      {hasMoodData ? (
+                        <WellbeingScore score={wellbeingScore} />
+                      ) : (
+                        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
+                          Complete your first check-in to generate a wellbeing score.
+                        </div>
+                      )}
                     </Card>
                   </div>
 
@@ -638,25 +768,37 @@ export default function OnboardingPage() {
                     <Card className="p-6">
                       <h2 className="text-lg font-semibold mb-4">Energy Patterns</h2>
                       <p className="text-sm text-text-secondary mb-4">Energy levels by time of day</p>
-                      <EnergyHeatmap data={energyHeatmapData} />
+                      {hasEnergyData ? (
+                        <EnergyHeatmap data={energyHeatmapData} />
+                      ) : (
+                        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
+                          Track your energy levels across different times of day to populate this view.
+                        </div>
+                      )}
                     </Card>
                   </div>
 
                   <Card className="p-6 mb-8">
                     <h2 className="text-lg font-semibold mb-4">Wellness Goals</h2>
-                    <div className="space-y-6">
-                      {wellnessGoals.map((goal) => (
-                        <div key={goal.goal}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium">{goal.goal}</span>
-                            <span className="text-sm text-text-muted">
-                              {goal.current} / {goal.target} {goal.unit}
-                            </span>
+                    {wellnessGoals.length > 0 ? (
+                      <div className="space-y-6">
+                        {wellnessGoals.map((goal) => (
+                          <div key={goal.goal}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">{goal.goal}</span>
+                              <span className="text-sm text-text-muted">
+                                {goal.current} / {goal.target} {goal.unit}
+                              </span>
+                            </div>
+                            <Progress value={goal.progress} className="h-2" />
                           </div>
-                          <Progress value={goal.progress} className="h-2" />
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex h-[160px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
+                        Set a wellness goal to start tracking your progress here.
+                      </div>
+                    )}
                   </Card>
 
                   <Card className="p-6 mb-8">
@@ -664,24 +806,30 @@ export default function OnboardingPage() {
                     <p className="text-sm text-text-secondary mb-4">
                       Average mood improvement after using each strategy
                     </p>
-                    <div className="space-y-3">
-                      {Object.entries(copingEffectiveness)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([strategy, effectiveness]) => (
-                          <div key={strategy} className="flex items-center justify-between">
-                            <span className="text-sm font-medium capitalize">{strategy}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-success rounded-full transition-all duration-500"
-                                  style={{ width: `${(effectiveness / 10) * 100}%` }}
-                                />
+                    {Object.keys(copingEffectiveness).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(copingEffectiveness)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([strategy, effectiveness]) => (
+                            <div key={strategy} className="flex items-center justify-between">
+                              <span className="text-sm font-medium capitalize">{strategy}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-success rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.min(effectiveness / 10, 1) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm text-text-muted w-12 text-right">{effectiveness}/10</span>
                               </div>
-                              <span className="text-sm text-text-muted w-12 text-right">{effectiveness}/10</span>
                             </div>
-                          </div>
-                        ))}
-                    </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="flex h-[160px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
+                        Once you log coping strategies, we&apos;ll analyze what helps you most.
+                      </div>
+                    )}
                   </Card>
                 </div>
               </TabsContent>

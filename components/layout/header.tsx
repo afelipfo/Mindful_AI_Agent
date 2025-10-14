@@ -33,7 +33,9 @@ export function Header({ onCheckInClick }: HeaderProps = {}) {
             <Button onClick={onCheckInClick}>Get Started</Button>
           ) : (
             <Button asChild>
-              <Link href="/onboarding">Get Started</Link>
+              <Link href="/auth/signin?callbackUrl=%2Fonboarding" prefetch={false}>
+                Get Started
+              </Link>
             </Button>
           )}
 
@@ -69,7 +71,11 @@ export function Header({ onCheckInClick }: HeaderProps = {}) {
               </Button>
             ) : (
               <Button asChild className="w-full">
-                <Link href="/onboarding" onClick={() => setMobileMenuOpen(false)}>
+                <Link
+                  href="/auth/signin?callbackUrl=%2Fonboarding"
+                  prefetch={false}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
                   Get Started
                 </Link>
               </Button>

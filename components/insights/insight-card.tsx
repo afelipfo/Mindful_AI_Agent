@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { AIInsight } from "@/lib/sample-data"
+import type { AIInsight } from "@/types/wellness"
 
 interface InsightCardProps {
   insight: AIInsight
@@ -72,9 +72,11 @@ export const InsightCard = memo(function InsightCard({ insight }: InsightCardPro
               </button>
             )}
             <div className="mt-4 flex gap-2">
-              <Button size="sm" variant="outline">
-                {insight.action}
-              </Button>
+              {insight.action && (
+                <Button size="sm" variant="outline">
+                  {insight.action}
+                </Button>
+              )}
               <Button size="sm" variant="ghost">
                 Dismiss
               </Button>

@@ -1,32 +1,6 @@
 // Sample data for the wellness app
 
-export interface MoodEntry {
-  date: string
-  mood: number
-  energy: number
-  emotions: string[]
-  triggers: string[]
-  coping: string[]
-  type: "text" | "voice" | "emoji" | "photo"
-  note?: string
-  audioUrl?: string
-  photoUrl?: string
-}
-
-export interface WellnessGoal {
-  goal: string
-  target: number
-  current: number
-  unit: string
-  progress: number
-}
-
-export interface AIInsight {
-  type: "pattern" | "recommendation" | "alert"
-  title: string
-  description: string
-  action: string
-}
+import type { AIInsight, MoodEntry, WellnessGoal } from "@/types/wellness"
 
 export interface EmpathyRecommendation {
   empathyMessage: string

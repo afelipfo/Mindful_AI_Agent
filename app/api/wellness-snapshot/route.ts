@@ -1,7 +1,8 @@
+import { randomUUID } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { withRateLimit } from "@/lib/api-middleware"
-import type { WellnessSnapshot } from "@/lib/wellness-data"
+import type { WellnessSnapshot } from "@/types/wellness"
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from("mood_entries")
         .select(
-          "id, date, mood_score, energy_level, emotions, triggers, coping_strategies, entry_type, note, audio_url, photo_url",
+          "id, date, mood_score, energy_level, emotions, triggers, coping_strategies, entry_type, note, audio_url, photo_url, created_at",
         )
         .eq("user_id", userId)
         .order("date", { ascending: false })
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
 
     const mappedMoodEntries =
       moodEntriesData?.map((entry) => ({
+        id: entry.id ?? randomUUID(),
         date: entry.date ?? new Date().toISOString().slice(0, 10),
         mood: entry.mood_score ?? 5,
         energy: entry.energy_level ?? 5,
@@ -59,6 +61,7 @@ export async function GET(request: NextRequest) {
         note: entry.note ?? undefined,
         audioUrl: entry.audio_url ?? undefined,
         photoUrl: entry.photo_url ?? undefined,
+        createdAt: entry.created_at ?? undefined,
       })) ?? []
 
     const triggerFrequency: Record<string, number> = {}
@@ -102,10 +105,13 @@ export async function GET(request: NextRequest) {
 
     const mappedInsights =
       insightsData?.map((insight) => ({
-        type: insight.insight_type === "alert" || insight.insight_type === "pattern" ? insight.insight_type : "recommendation",
+        type:
+          insight.insight_type === "alert" || insight.insight_type === "pattern"
+            ? insight.insight_type
+            : "recommendation",
         title: insight.title ?? "Insight",
         description: insight.description ?? "",
-        action: insight.action ?? "",
+        action: insight.action ?? undefined,
       })) ?? []
 
     const response: WellnessSnapshot = {

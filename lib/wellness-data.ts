@@ -1,27 +1,20 @@
-import {
-  moodEntries,
-  triggerFrequency,
-  copingEffectiveness,
-  wellnessGoals,
-  aiInsights,
-} from "@/lib/sample-data"
+import type { WellnessSnapshot } from "@/types/wellness"
 
-import type { MoodEntry, WellnessGoal, AIInsight } from "@/lib/sample-data"
-
-export interface WellnessSnapshot {
-  moodEntries: MoodEntry[]
-  triggerFrequency: Record<string, number>
-  copingEffectiveness: Record<string, number>
-  wellnessGoals: WellnessGoal[]
-  aiInsights: AIInsight[]
+export const EMPTY_WELLNESS_SNAPSHOT: WellnessSnapshot = {
+  moodEntries: [],
+  triggerFrequency: {},
+  copingEffectiveness: {},
+  wellnessGoals: [],
+  aiInsights: [],
 }
 
-export function getFallbackWellnessSnapshot(): WellnessSnapshot {
+export function getEmptyWellnessSnapshot(): WellnessSnapshot {
   return {
-    moodEntries,
-    triggerFrequency,
-    copingEffectiveness,
-    wellnessGoals,
-    aiInsights,
+    moodEntries: [],
+    triggerFrequency: {},
+    copingEffectiveness: {},
+    wellnessGoals: [],
+    aiInsights: [],
   }
 }
+

@@ -28,7 +28,9 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col items-center justify-center gap-4 animate-fade-in [animation-delay:300ms] lg:items-start lg:justify-start">
               <Button asChild size="lg" className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
-                <Link href="/onboarding">Start full onboarding</Link>
+                <Link href="/auth/signin?callbackUrl=%2Fonboarding" prefetch={false}>
+                  Start full onboarding
+                </Link>
               </Button>
               <p className="text-sm text-text-muted">Prefer a faster check-in? Try the analyzer alongside.</p>
             </div>
@@ -119,7 +121,9 @@ export default function LandingPage() {
             Join thousands of people improving their mental health with AI-powered insights.
           </p>
           <Button asChild size="lg">
-            <Link href="/onboarding">Begin Your Journey</Link>
+            <Link href="/auth/signin?callbackUrl=%2Fonboarding" prefetch={false}>
+              Begin Your Journey
+            </Link>
           </Button>
         </div>
       </section>

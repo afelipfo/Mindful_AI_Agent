@@ -1,7 +1,7 @@
 "use client"
 
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
-import type { MoodEntry } from "@/lib/sample-data"
+import type { MoodEntry } from "@/types/wellness"
 import { format } from "date-fns"
 
 interface MoodTrendChartProps {
