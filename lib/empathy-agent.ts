@@ -161,6 +161,17 @@ export function inferMoodFromText(text: string): { mood: MoodCategory; score: nu
 
   score = Math.min(10, Math.max(2, score))
 
+  if (matchedEmotions.size === 0) {
+    const fallbackMood: MoodCategory = normalized.length <= 6 ? "excited" : "happy"
+    const fallbackScore = normalized.length <= 6 ? 7 : 6
+
+    return {
+      mood: fallbackMood,
+      score: fallbackScore,
+      emotions: [],
+    }
+  }
+
   return {
     mood: bestMood,
     score,

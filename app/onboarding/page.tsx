@@ -801,7 +801,7 @@ export default function OnboardingPage() {
             onSendMessage={handleSendMessage}
             placeholder={onboardingQuestions[currentStepIndex]?.placeholder || "Type your response..."}
             isLoading={isLoading}
-            enableMultimodal={currentStepIndex === 1}
+            enableMultimodal
           />
         )}
       </div>

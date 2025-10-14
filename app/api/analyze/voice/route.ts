@@ -111,9 +111,12 @@ async function classifyTranscript(transcript: string): Promise<VoiceAnalysis> {
 
   const fallback = inferMoodFromText(transcript)
 
+  const normalizedLabel =
+    typeof parsed.moodLabel === "string" ? parsed.moodLabel.toLowerCase() : fallback.mood
+
   return {
     transcript,
-    moodLabel: typeof parsed.moodLabel === "string" ? parsed.moodLabel : fallback.mood,
+    moodLabel: normalizedLabel,
     moodScore:
       typeof parsed.moodScore === "number" && !Number.isNaN(parsed.moodScore) ? parsed.moodScore : fallback.score,
     energyLevel:

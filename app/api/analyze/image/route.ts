@@ -60,8 +60,11 @@ async function analyzeImage(url: string): Promise<ImageAnalysis> {
     parsed = {}
   }
 
+  const normalizedLabel =
+    typeof parsed.moodLabel === "string" ? parsed.moodLabel.toLowerCase() : "neutral"
+
   return {
-    moodLabel: typeof parsed.moodLabel === "string" ? parsed.moodLabel : "neutral",
+    moodLabel: normalizedLabel,
     confidence:
       typeof parsed.confidence === "number" && !Number.isNaN(parsed.confidence)
         ? Math.max(0, Math.min(100, parsed.confidence))
