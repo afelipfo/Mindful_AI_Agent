@@ -52,6 +52,10 @@ interface RecommendationSet {
     reason: string
     benefits: string
     address?: string
+    coordinates?: {
+      lat: number
+      lng: number
+    }
   }
 }
 
