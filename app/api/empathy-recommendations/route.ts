@@ -1,10 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateEmpathyRecommendations, detectMoodCategory } from "@/lib/empathy-agent"
+import { empathyRecommendationSchema } from "@/lib/validations/empathy"
+import { ZodError } from "zod"
+import { withRateLimit } from "@/lib/api-middleware"
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting (AI tier - 5 requests per minute)
+    const rateLimitResult = await withRateLimit(request, 'ai')
+    if (rateLimitResult) {
+      return rateLimitResult
+    }
+
     const body = await request.json()
-    const { mood, context, moodScore, emotions, energyLevel, triggers, recentMoods } = body
+
+    // Validate input
+    const validatedData = empathyRecommendationSchema.parse(body)
+    const { mood, context, moodScore, emotions, energyLevel } = validatedData
 
     let detectedMood: string
     let score: number
@@ -36,7 +48,25 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(recommendations)
   } catch (error) {
+    // Handle validation errors
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        {
+          error: "Invalid input data",
+          details: error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
+        },
+        { status: 400 }
+      )
+    }
+
+    // Handle other errors
     console.error("[v0] Error in empathy recommendations API:", error)
-    return NextResponse.json({ error: "Failed to generate recommendations" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Failed to generate recommendations" },
+      { status: 500 }
+    )
   }
 }

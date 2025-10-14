@@ -2,25 +2,55 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
 import { ProgressSidebar } from "@/components/onboarding/progress-sidebar"
 import { ConversationInterface } from "@/components/onboarding/conversation-interface"
-import { EmpathyRecommendations } from "@/components/check-in/empathy-recommendations"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, BarChart3, Sparkles } from "lucide-react"
 import Link from "next/link"
-import { MetricCard } from "@/components/dashboard/metric-card"
-import { MoodTrendChart } from "@/components/dashboard/mood-trend-chart"
-import { TriggerCloud } from "@/components/dashboard/trigger-cloud"
-import { WellbeingScore } from "@/components/dashboard/wellbeing-score"
-import { EnergyHeatmap } from "@/components/dashboard/energy-heatmap"
-import { InsightCard } from "@/components/insights/insight-card"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
 import { moodEntries, triggerFrequency, copingEffectiveness, wellnessGoals, aiInsights } from "@/lib/sample-data"
 import { format } from "date-fns"
 import { Progress } from "@/components/ui/progress"
+
+// Dynamically import heavy components
+const EmpathyRecommendations = dynamic(
+  () => import("@/components/check-in/empathy-recommendations").then(mod => ({ default: mod.EmpathyRecommendations })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center p-8">Loading...</div> }
+)
+
+const MetricCard = dynamic(
+  () => import("@/components/dashboard/metric-card").then(mod => ({ default: mod.MetricCard })),
+  { ssr: false }
+)
+
+const MoodTrendChart = dynamic(
+  () => import("@/components/dashboard/mood-trend-chart").then(mod => ({ default: mod.MoodTrendChart })),
+  { ssr: false, loading: () => <div className="h-[300px] animate-pulse bg-muted rounded-lg" /> }
+)
+
+const TriggerCloud = dynamic(
+  () => import("@/components/dashboard/trigger-cloud").then(mod => ({ default: mod.TriggerCloud })),
+  { ssr: false, loading: () => <div className="h-[300px] animate-pulse bg-muted rounded-lg" /> }
+)
+
+const WellbeingScore = dynamic(
+  () => import("@/components/dashboard/wellbeing-score").then(mod => ({ default: mod.WellbeingScore })),
+  { ssr: false }
+)
+
+const EnergyHeatmap = dynamic(
+  () => import("@/components/dashboard/energy-heatmap").then(mod => ({ default: mod.EnergyHeatmap })),
+  { ssr: false, loading: () => <div className="h-[200px] animate-pulse bg-muted rounded-lg" /> }
+)
+
+const InsightCard = dynamic(
+  () => import("@/components/insights/insight-card").then(mod => ({ default: mod.InsightCard })),
+  { ssr: false }
+)
 
 interface Message {
   id: string
@@ -256,7 +286,7 @@ export default function OnboardingPage() {
               <TabsContent value="empathy" className="m-0 p-0">
                 {empathyData && (
                   <EmpathyRecommendations
-                    data={empathyData}
+                    recommendation={empathyData}
                     onDismiss={() => {
                       setActiveTab("dashboard")
                     }}
@@ -505,7 +535,7 @@ export default function OnboardingPage() {
             onSendMessage={handleSendMessage}
             placeholder={onboardingQuestions[currentStepIndex]?.placeholder || "Type your response..."}
             isLoading={isLoading}
-            enableMultimodal={currentStepIndex >= 1}
+            enableMultimodal={currentStepIndex === 1}
           />
         )}
       </div>

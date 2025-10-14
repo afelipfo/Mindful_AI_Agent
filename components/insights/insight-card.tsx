@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
@@ -11,7 +11,7 @@ interface InsightCardProps {
   insight: AIInsight
 }
 
-export function InsightCard({ insight }: InsightCardProps) {
+export const InsightCard = memo(function InsightCard({ insight }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const getIcon = () => {
@@ -84,4 +84,4 @@ export function InsightCard({ insight }: InsightCardProps) {
       </div>
     </Card>
   )
-}
+})

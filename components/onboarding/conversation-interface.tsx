@@ -13,6 +13,8 @@ import { VoiceRecorder } from "@/components/check-in/voice-recorder"
 import { EmojiSelector } from "@/components/check-in/emoji-selector"
 import { PhotoCapture } from "@/components/check-in/photo-capture"
 import { cn } from "@/lib/utils"
+import { uploadAudio, uploadImage } from "@/lib/upload"
+import { useToast } from "@/hooks/use-toast"
 
 interface Message {
   id: string
@@ -44,8 +46,10 @@ export function ConversationInterface({
   const [input, setInput] = useState("")
   const [activeTab, setActiveTab] = useState("text")
   const [textJournalValue, setTextJournalValue] = useState("")
+  const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { toast } = useToast()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -73,8 +77,35 @@ export function ConversationInterface({
     }
   }
 
-  const handleVoiceComplete = (audioBlob: Blob) => {
-    onSendMessage("Voice recording captured", "voice", { audioBlob })
+  const handleVoiceComplete = (_audioBlob: Blob) => {
+    // This is called when recording is stopped, but we don't send yet
+  }
+
+  const handleVoiceSend = async (audioBlob: Blob) => {
+    try {
+      setIsUploading(true)
+      toast({
+        title: "Uploading audio...",
+        description: "Please wait while we process your recording",
+      })
+
+      const audioUrl = await uploadAudio(audioBlob)
+
+      onSendMessage("Voice recording captured", "voice", { audioUrl })
+
+      toast({
+        title: "Audio uploaded",
+        description: "Your voice recording has been saved",
+      })
+    } catch (error) {
+      console.error("Failed to upload audio:", error)
+      toast({
+        title: "❌ Upload failed",
+        description: "Failed to upload audio. Please try again.",
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleEmojiSelect = (emoji: string, label: string, value: number, note?: string) => {
@@ -82,8 +113,35 @@ export function ConversationInterface({
     onSendMessage(message, "emoji", { emoji, label, value, note })
   }
 
-  const handlePhotoCapture = (file: File) => {
-    onSendMessage("Photo captured", "photo", { file })
+  const handlePhotoCapture = (_file: File) => {
+    // This is called when photo is selected, but we don't send yet
+  }
+
+  const handlePhotoSend = async (file: File) => {
+    try {
+      setIsUploading(true)
+      toast({
+        title: "Uploading photo...",
+        description: "Please wait while we process your image",
+      })
+
+      const photoUrl = await uploadImage(file)
+
+      onSendMessage("Photo captured", "photo", { photoUrl })
+
+      toast({
+        title: "Photo uploaded",
+        description: "Your photo has been saved",
+      })
+    } catch (error) {
+      console.error("Failed to upload photo:", error)
+      toast({
+        title: "❌ Upload failed",
+        description: "Failed to upload photo. Please try again.",
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -176,7 +234,7 @@ export function ConversationInterface({
 
             <TabsContent value="text" className="mt-0">
               <div className="space-y-3">
-                <TextJournal value={textJournalValue} onChange={setTextJournalValue} />
+                <TextJournal value={textJournalValue} onChange={setTextJournalValue} onSubmit={handleTextJournalSubmit} />
                 <Button
                   onClick={handleTextJournalSubmit}
                   disabled={!textJournalValue.trim() || isLoading}
@@ -189,7 +247,7 @@ export function ConversationInterface({
             </TabsContent>
 
             <TabsContent value="voice" className="mt-0">
-              <VoiceRecorder onRecordingComplete={handleVoiceComplete} />
+              <VoiceRecorder onRecordingComplete={handleVoiceComplete} onSend={handleVoiceSend} />
             </TabsContent>
 
             <TabsContent value="emoji" className="mt-0">
@@ -197,7 +255,7 @@ export function ConversationInterface({
             </TabsContent>
 
             <TabsContent value="photo" className="mt-0">
-              <PhotoCapture onPhotoCapture={handlePhotoCapture} />
+              <PhotoCapture onPhotoCapture={handlePhotoCapture} onSend={handlePhotoSend} />
             </TabsContent>
           </Tabs>
         ) : (

@@ -1,20 +1,22 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Mic, Play, Pause, X } from "lucide-react"
+import { Mic, Play, Pause, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob) => void
+  onSend?: (audioBlob: Blob) => void
 }
 
-export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onSend }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioURL, setAudioURL] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [waveformHeights, setWaveformHeights] = useState<number[]>(Array(20).fill(20))
+  const [savedAudioBlob, setSavedAudioBlob] = useState<Blob | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -44,7 +46,7 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" })
         const url = URL.createObjectURL(audioBlob)
         setAudioURL(url)
-        onRecordingComplete?.(audioBlob)
+        setSavedAudioBlob(audioBlob)
         stream.getTracks().forEach((track) => track.stop())
       }
 
@@ -110,8 +112,16 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
       audioRef.current = null
     }
     setAudioURL(null)
+    setSavedAudioBlob(null)
     setIsPlaying(false)
     setRecordingTime(0)
+  }
+
+  const handleSendRecording = () => {
+    if (savedAudioBlob) {
+      onSend?.(savedAudioBlob)
+      onRecordingComplete?.(savedAudioBlob)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -121,7 +131,7 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 py-6">
+    <div className="flex flex-col items-center gap-6 py-6" role="region" aria-label="Voice recording">
       {/* Recording Button */}
       <div className="relative">
         <button
@@ -133,9 +143,10 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
               : "bg-primary text-primary-foreground hover:scale-110",
           )}
           aria-label={isRecording ? "Stop recording" : "Start recording"}
+          aria-pressed={isRecording}
           disabled={false}
         >
-          <Mic className="h-8 w-8" />
+          <Mic className="h-8 w-8" aria-hidden="true" />
         </button>
         {isRecording && (
           <div className="absolute inset-0 rounded-full border-4 border-danger animate-pulse-ring pointer-events-none" />
@@ -143,16 +154,27 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
       </div>
 
       {/* Timer */}
-      <div className="text-base font-mono tabular-nums text-text-primary">{formatTime(recordingTime)}</div>
+      <div
+        className="text-base font-mono tabular-nums text-text-primary"
+        role="timer"
+        aria-label={`Recording time: ${formatTime(recordingTime)}`}
+      >
+        {formatTime(recordingTime)}
+      </div>
 
       {/* Waveform */}
       {isRecording && (
-        <div className="flex items-center justify-center gap-1 h-[60px]">
+        <div
+          className="flex items-center justify-center gap-1 h-[60px]"
+          role="img"
+          aria-label="Audio waveform visualization"
+        >
           {waveformHeights.map((height, index) => (
             <div
               key={index}
               className="w-1 bg-primary rounded-full transition-all duration-100 ease-[var(--ease-slide)]"
               style={{ height: `${height}px` }}
+              aria-hidden="true"
             />
           ))}
         </div>
@@ -160,12 +182,28 @@ export function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
 
       {/* Playback Controls */}
       {audioURL && !isRecording && (
-        <div className="flex items-center gap-4">
-          <Button onClick={togglePlayback} size="icon" variant="outline">
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          </Button>
-          <Button onClick={deleteRecording} size="icon" variant="outline">
-            <X className="h-4 w-4" />
+        <div className="flex flex-col items-center gap-4 w-full" role="group" aria-label="Recording controls">
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={togglePlayback}
+              size="icon"
+              variant="outline"
+              aria-label={isPlaying ? "Pause playback" : "Play recording"}
+            >
+              {isPlaying ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
+            </Button>
+            <Button
+              onClick={deleteRecording}
+              size="icon"
+              variant="outline"
+              aria-label="Delete recording"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+          <Button onClick={handleSendRecording} className="w-full max-w-md">
+            <Send className="h-4 w-4 mr-2" aria-hidden="true" />
+            Send Recording
           </Button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import type React from "react"
+import { memo } from "react"
 import { Card } from "@/components/ui/card"
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -15,7 +16,7 @@ interface MetricCardProps {
   children?: React.ReactNode
 }
 
-export function MetricCard({ title, value, trend, icon, children }: MetricCardProps) {
+export const MetricCard = memo(function MetricCard({ title, value, trend, icon, children }: MetricCardProps) {
   return (
     <Card className="p-6 shadow-sm transition-shadow duration-200 ease-[var(--ease-hover)] hover:shadow-md">
       <div className="flex items-start justify-between mb-4">
@@ -42,4 +43,4 @@ export function MetricCard({ title, value, trend, icon, children }: MetricCardPr
       {children && <div className="mt-4">{children}</div>}
     </Card>
   )
-}
+})
