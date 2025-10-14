@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     const filteredResponses = payload.responses.filter((response) => response.response.trim().length > 0)
 
+    console.log("[DEBUG] Saving onboarding data for user:", userId)
+    console.log("[DEBUG] Filtered responses:", filteredResponses.length)
+    console.log("[DEBUG] Mood entry:", {
+      ...payload.moodEntry,
+      entryType:
+        payload.moodEntry.entryType === "voice" ||
+        payload.moodEntry.entryType === "emoji" ||
+        payload.moodEntry.entryType === "photo"
+          ? payload.moodEntry.entryType
+          : "text",
+      timestamp: new Date().toISOString(),
+    })
+
     const { error: rpcError } = await supabase.rpc("process_onboarding_check_in", {
       p_user_id: userId,
       p_responses: filteredResponses,
@@ -88,7 +101,23 @@ export async function POST(request: NextRequest) {
     })
 
     if (rpcError) {
+      console.error("[ERROR] RPC Error:", rpcError)
       throw rpcError
+    }
+
+    console.log("[SUCCESS] Onboarding data saved successfully")
+
+    // Mark onboarding as completed
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', userId)
+
+    if (profileError) {
+      console.error("[ERROR] Failed to update onboarding status:", profileError)
+      // Don't fail the request if profile update fails
+    } else {
+      console.log("[SUCCESS] Onboarding marked as completed for user:", userId)
     }
 
     return NextResponse.json({ success: true })
