@@ -23,6 +23,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [isCameraReady, setIsCameraReady] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
 
   const stopCamera = useCallback(() => {
@@ -34,6 +35,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
       videoRef.current.srcObject = null
     }
     setIsCameraActive(false)
+    setIsCameraReady(false)
   }, [])
 
   useEffect(() => {
@@ -73,6 +75,24 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
     }
   }, [stopCamera])
 
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const markReady = () => {
+      setIsCameraReady(true)
+      setCameraError(null)
+    }
+
+    video.addEventListener("loadeddata", markReady)
+    video.addEventListener("playing", markReady)
+
+    return () => {
+      video.removeEventListener("loadeddata", markReady)
+      video.removeEventListener("playing", markReady)
+    }
+  }, [isCameraActive])
+
   const startCamera = useCallback(async () => {
     setCameraError(null)
     try {
@@ -91,17 +111,33 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
       setIsCameraActive(true)
       setPreview(null)
       setCapturedFile(null)
+      setIsCameraReady(false)
 
       if (videoRef.current) {
         const video = videoRef.current
         video.srcObject = mediaStream
-        const playPromise = video.play()
-        if (playPromise && typeof playPromise.then === "function") {
-          playPromise.catch((playError) => {
-            console.warn("Camera preview was prevented from autoplaying:", playError)
-            setCameraError("Press the preview to start the camera if it stays paused.")
-          })
+        const attemptPlay = () => {
+          const playPromise = video.play()
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise.catch((playError) => {
+              console.warn("Camera preview was prevented from autoplaying:", playError)
+              setCameraError("Tap the preview to start the camera if it stays paused.")
+            })
+          }
         }
+
+        if (video.readyState >= 2) {
+          setIsCameraReady(true)
+        }
+
+        const warmupHandler = () => {
+          setIsCameraReady(true)
+          attemptPlay()
+          video.removeEventListener("loadedmetadata", warmupHandler)
+        }
+
+        video.addEventListener("loadedmetadata", warmupHandler)
+        requestAnimationFrame(attemptPlay)
       }
     } catch (error) {
       console.error("Error accessing camera:", error)
@@ -113,17 +149,17 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
   }, [stopCamera])
 
   const capturePhoto = () => {
+    if (!isCameraReady) {
+      setCameraError("Estamos iniciando la cámara, intenta capturar de nuevo en unos segundos.")
+      return
+    }
+
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current
       const canvas = canvasRef.current
       const context = canvas.getContext('2d')
 
       if (context) {
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-          setCameraError("La cámara todavía se está iniciando. Intenta capturar nuevamente en un momento.")
-          return
-        }
-
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         context.drawImage(video, 0, 0)
@@ -133,7 +169,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
             const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })
             handleFileChange(file)
           }
-        }, 'image/jpeg', 0.8)
+        }, 'image/jpeg', 0.9)
 
         stopCamera()
       }
@@ -164,8 +200,8 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
       onPhotoCapture?.(file)
 
       // Reset file inputs
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      if (cameraInputRef.current) cameraInputRef.current.value = ''
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (cameraInputRef.current) cameraInputRef.current.value = ""
     }
   }
 
@@ -189,6 +225,14 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
     }
   }
 
+  const handleVideoInteraction = () => {
+    if (videoRef.current) {
+      videoRef.current.play().catch((playError) => {
+        console.warn("Manual play attempt failed:", playError)
+      })
+    }
+  }
+
   return (
     <div className="flex flex-col items-center gap-6 py-6">
       {isCameraActive ? (
@@ -199,8 +243,15 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
               autoPlay
               playsInline
               muted
+              onClick={handleVideoInteraction}
               className="w-full aspect-square object-cover rounded-xl border-2 border-border"
             />
+            {!isCameraReady && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-background/80 text-sm text-text-secondary">
+                <span>Activating camera…</span>
+                <span className="text-xs text-text-muted">Permite el acceso y espera un instante.</span>
+              </div>
+            )}
             <canvas ref={canvasRef} className="hidden" />
             <Button
               onClick={stopCamera}
@@ -212,7 +263,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={capturePhoto} className="w-full max-w-md">
+          <Button onClick={capturePhoto} className="w-full max-w-md" disabled={!isCameraReady}>
             <Camera className="h-4 w-4 mr-2" />
             Capture Photo
           </Button>

@@ -1,3 +1,51 @@
+type UploadResponse = { url: string; filename: string; size: number; type: string }
+
+const FALLBACK_TYPE = "application/octet-stream"
+
+async function encodeAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result)
+      } else {
+        reject(new Error("Unable to encode file"))
+      }
+    }
+    reader.onerror = () => reject(new Error("Unable to encode file"))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function inlineFallback(file: File): Promise<UploadResponse> {
+  const dataUrl = await encodeAsDataUrl(file)
+  return {
+    url: dataUrl,
+    filename: file.name || `upload-${Date.now()}`,
+    size: file.size,
+    type: file.type || FALLBACK_TYPE,
+  }
+}
+
+function normalizeFile(input: File | Blob, filename?: string): File {
+  if (input instanceof File) {
+    return input
+  }
+
+  const safeType = input.type || FALLBACK_TYPE
+  const extension = safeType.includes("/")
+    ? safeType.split("/")[1]?.split(";")[0] || "bin"
+    : "bin"
+  const baseName = safeType.startsWith("audio/")
+    ? "recording"
+    : safeType.startsWith("image/")
+      ? "snapshot"
+      : "upload"
+  const safeName = filename || `${baseName}-${Date.now()}.${extension}`
+
+  return new File([input], safeName, { type: safeType })
+}
+
 /**
  * Upload a file to the server
  * @param file - File or Blob to upload
@@ -7,28 +55,35 @@
 export async function uploadFile(
   file: File | Blob,
   filename?: string
-): Promise<{ url: string; filename: string; size: number; type: string }> {
+): Promise<UploadResponse> {
+  const normalized = normalizeFile(file, filename)
   const formData = new FormData()
+  formData.append("file", normalized)
 
-  // If it's a Blob, convert to File
-  if (file instanceof Blob && !(file instanceof File)) {
-    const actualFilename = filename || `recording-${Date.now()}.wav`
-    formData.append('file', new File([file], actualFilename, { type: file.type }))
-  } else {
-    formData.append('file', file)
+  try {
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!response.ok) {
+      if (typeof window !== "undefined") {
+        return inlineFallback(normalized)
+      }
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.error || "Failed to upload file")
+    }
+
+    return response.json()
+  } catch (error) {
+    if (typeof window !== "undefined") {
+      return inlineFallback(normalized)
+    }
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error("Failed to upload file")
   }
-
-  const response = await fetch('/api/upload', {
-    method: 'POST',
-    body: formData,
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to upload file')
-  }
-
-  return response.json()
 }
 
 /**
