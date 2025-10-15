@@ -3,9 +3,46 @@
 import Link from "next/link"
 import { Brain, Heart, Zap, TrendingUp, Mic, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
 import { QuickMoodAnalyzer } from "@/components/check-in/quick-mood-analyzer"
+import type { ReactNode } from "react"
+
+interface TimelineItemProps {
+  step: string
+  icon: ReactNode
+  title: string
+  description: string
+}
+
+function Timeline({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative mx-auto max-w-4xl space-y-10 md:space-y-12">
+      <div className="absolute left-[22px] top-4 hidden h-[calc(100%-2rem)] w-px bg-border md:block" />
+      {children}
+    </div>
+  )
+}
+
+function TimelineItem({ step, icon, title, description }: TimelineItemProps) {
+  return (
+    <div className="relative flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
+      <div className="flex items-center gap-3 md:min-w-[160px]">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-sm">
+          {icon}
+        </div>
+        <div className="md:hidden">
+          <p className="text-xs uppercase tracking-wide text-primary/70">{step}</p>
+          <p className="text-base font-semibold leading-tight">{title}</p>
+        </div>
+      </div>
+      <div className="md:mt-1">
+        <p className="hidden text-xs uppercase tracking-widest text-primary/70 md:block">{step}</p>
+        <h3 className="mb-2 hidden text-lg font-semibold md:block">{title}</h3>
+        <p className="text-sm text-text-secondary md:text-base">{description}</p>
+      </div>
+    </div>
+  )
+}
 
 export default function LandingPage() {
   return (
@@ -14,8 +51,8 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 md:px-6 md:py-24">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-          <div className="mx-auto max-w-xl text-center lg:text-left">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+            <div className="mx-auto max-w-xl text-center lg:text-left">
             <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 animate-fade-in">
               <Brain className="h-8 w-8 text-primary" />
             </div>
@@ -49,82 +86,44 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                <Mic className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">Multimodal Check-Ins</h3>
-              <p className="text-text-secondary">
-                Express yourself through text, voice notes, emojis, or photos. Choose what feels right in the moment.
-              </p>
-            </Card>
-
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
-                <TrendingUp className="h-6 w-6 text-success" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">Mood Tracking</h3>
-              <p className="text-text-secondary">
-                Visualize your emotional patterns over time with beautiful charts and insights.
-              </p>
-            </Card>
-
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
-                <Brain className="h-6 w-6 text-secondary" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">AI Insights</h3>
-              <p className="text-text-secondary">
-                Get personalized recommendations based on your unique patterns and triggers.
-              </p>
-            </Card>
-
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
-                <Zap className="h-6 w-6 text-warning" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">Energy Tracking</h3>
-              <p className="text-text-secondary">
-                Monitor your energy levels throughout the day and discover your peak performance times.
-              </p>
-            </Card>
-
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-danger/10">
-                <Heart className="h-6 w-6 text-danger" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">Wellness Goals</h3>
-              <p className="text-text-secondary">
-                Set and track progress toward your mental health goals with actionable steps.
-              </p>
-            </Card>
-
-            <Card className="p-6 transition-shadow hover:shadow-lg">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-chart-2/10">
-                <Camera className="h-6 w-6 text-chart-2" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">Trigger Analysis</h3>
-              <p className="text-text-secondary">
-                Identify patterns in what affects your mood and learn effective coping strategies.
-              </p>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="container mx-auto px-4 py-16 md:px-6 md:py-24">
-        <div className="mx-auto max-w-3xl rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/5 p-8 text-center md:p-12">
-          <h2 className="mb-4 text-3xl font-bold md:text-4xl">Start Your Wellness Journey Today</h2>
-          <p className="mb-8 text-lg text-text-secondary">
-            Join thousands of people improving their mental health with AI-powered insights.
-          </p>
-          <Button asChild size="lg">
-            <Link href="/auth/signin?callbackUrl=%2Fonboarding" prefetch={false}>
-              Begin Your Journey
-            </Link>
-          </Button>
+          <Timeline>
+            <TimelineItem
+              step="Step 1"
+              icon={<Mic className="h-5 w-5" />}
+              title="Multimodal Check-Ins"
+              description="Express yourself through text, voice notes, emojis, or photos. Choose what feels right in the moment."
+            />
+            <TimelineItem
+              step="Step 2"
+              icon={<TrendingUp className="h-5 w-5" />}
+              title="Mood Tracking"
+              description="Visualize your emotional patterns over time with beautiful charts and insights."
+            />
+            <TimelineItem
+              step="Step 3"
+              icon={<Brain className="h-5 w-5" />}
+              title="AI Insights"
+              description="Get personalized recommendations based on your unique patterns and triggers."
+            />
+            <TimelineItem
+              step="Step 4"
+              icon={<Zap className="h-5 w-5" />}
+              title="Energy Tracking"
+              description="Monitor your energy levels throughout the day and discover your peak performance times."
+            />
+            <TimelineItem
+              step="Step 5"
+              icon={<Heart className="h-5 w-5" />}
+              title="Wellness Goals"
+              description="Set and track progress toward your mental health goals with actionable steps."
+            />
+            <TimelineItem
+              step="Step 6"
+              icon={<Camera className="h-5 w-5" />}
+              title="Trigger Analysis"
+              description="Identify patterns in what affects your mood and learn effective coping strategies."
+            />
+          </Timeline>
         </div>
       </section>
 
