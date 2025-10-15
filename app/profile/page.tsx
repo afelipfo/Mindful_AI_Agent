@@ -13,10 +13,7 @@ function MissingConfiguration() {
         <div className="rounded-xl border border-border bg-card/80 p-8 shadow-sm backdrop-blur">
           <h1 className="text-2xl font-semibold text-text-primary">Profile unavailable</h1>
           <p className="mt-2 text-sm text-text-secondary">
-            Supabase environment variables are missing. Add{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">SUPABASE_SERVICE_ROLE_KEY</code> to enable profile
-            management.
+            We couldn't reach the profile service. Double-check your Supabase environment variables and try again.
           </p>
         </div>
       </main>
@@ -25,36 +22,45 @@ function MissingConfiguration() {
 }
 
 export default async function ProfilePage() {
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    !process.env.SUPABASE_SERVICE_ROLE_KEY
-  ) {
-    return <MissingConfiguration />
-  }
-
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
     redirect("/auth/signin?callbackUrl=%2Fprofile")
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("full_name,email,avatar_url,bio")
-    .eq("id", session.user.id)
-    .maybeSingle()
-
-  if (error) {
-    console.error("[mindful-ai] profile page fetch error:", error)
+  let hasConfigError = false
+  let initialProfile = {
+    email: session.user.email ?? "",
+    fullName: session.user.name ?? "",
+    avatarUrl: null as string | null,
+    bio: "",
   }
 
-  const initialProfile = {
-    email: data?.email ?? session.user.email ?? "",
-    fullName: data?.full_name ?? session.user.name ?? "",
-    avatarUrl: data?.avatar_url ?? null,
-    bio: data?.bio ?? "",
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("full_name,email,avatar_url,bio")
+      .eq("id", session.user.id)
+      .maybeSingle()
+
+    if (error) {
+      console.error("[mindful-ai] profile page fetch error:", error)
+    } else if (data) {
+      initialProfile = {
+        email: data.email ?? session.user.email ?? "",
+        fullName: data.full_name ?? session.user.name ?? "",
+        avatarUrl: data.avatar_url ?? null,
+        bio: data.bio ?? "",
+      }
+    }
+  } catch (error) {
+    hasConfigError = true
+    console.error("[mindful-ai] profile page supabase error:", error)
+  }
+
+  if (hasConfigError) {
+    return <MissingConfiguration />
   }
 
   return (
