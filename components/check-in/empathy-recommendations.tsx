@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import type { EmpathyResponse } from "@/lib/empathy-agent"
@@ -47,13 +46,10 @@ const moodBadgeClasses: Record<string, string> = {
   excited: "bg-secondary/10 text-secondary border-secondary/40",
 }
 
-const clampConfidence = (value: number) => Math.max(0, Math.min(100, Math.round(value)))
-
 export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: EmpathyRecommendationsProps) {
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null)
   const { toast } = useToast()
 
-  const confidenceValue = clampConfidence(recommendation.confidence)
   const sources = recommendation.analysisSources ?? []
   const moodKey = recommendation.detectedMood?.toLowerCase()
   const moodLabel = moodLabels[moodKey] ?? recommendation.detectedMood
@@ -69,7 +65,7 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
   }
 
   const handleShare = async () => {
-    const shareText = `Mood: ${moodLabel}\nConfidence: ${confidenceValue}%\nSummary: ${recommendation.analysisSummary}\nEmpathy: ${recommendation.empathyMessage}`
+    const shareText = `Mood: ${moodLabel}\nSummary: ${recommendation.analysisSummary}\nEmpathy: ${recommendation.empathyMessage}`
 
     try {
       if (navigator.share) {
@@ -116,10 +112,6 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
                 >
                   {moodLabel}
                 </span>
-                <div className="flex flex-col text-xs text-text-muted">
-                  <span>Confidence</span>
-                  <span className="font-semibold text-text-primary">{confidenceValue}%</span>
-                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -137,14 +129,6 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
           </div>
 
           <div className="mt-6 space-y-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-text-muted">
-                <span>Analysis confidence</span>
-                <span>{confidenceValue}%</span>
-              </div>
-              <Progress value={confidenceValue} className="h-2" />
-            </div>
-
             <p className="text-sm leading-relaxed text-text-secondary">{recommendation.analysisSummary}</p>
 
             {sources.length > 0 && (

@@ -8,6 +8,17 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name TEXT,
   avatar_url TEXT,
   onboarding_completed BOOLEAN DEFAULT FALSE,
+  bio TEXT,
+  timezone TEXT,
+  preferred_language TEXT DEFAULT 'en',
+  notify_email BOOLEAN DEFAULT TRUE,
+  notify_push BOOLEAN DEFAULT FALSE,
+  notify_sms BOOLEAN DEFAULT FALSE,
+  daily_reminder BOOLEAN DEFAULT TRUE,
+  weekly_summary BOOLEAN DEFAULT TRUE,
+  reminder_time TEXT DEFAULT '09:00',
+  theme_preference TEXT DEFAULT 'system',
+  sound_enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
@@ -195,6 +206,19 @@ CREATE TRIGGER update_onboarding_responses_updated_at BEFORE UPDATE ON onboardin
 
 CREATE TRIGGER update_wellness_goals_updated_at BEFORE UPDATE ON wellness_goals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Ensure profile preference columns exist when applying incremental schema updates
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS timezone TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferred_language TEXT DEFAULT 'en';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_email BOOLEAN DEFAULT TRUE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_push BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_sms BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_reminder BOOLEAN DEFAULT TRUE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weekly_summary BOOLEAN DEFAULT TRUE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS reminder_time TEXT DEFAULT '09:00';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS theme_preference TEXT DEFAULT 'system';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sound_enabled BOOLEAN DEFAULT TRUE;
 
 -- Ensure unique onboarding steps per user
 DO $$

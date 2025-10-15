@@ -238,7 +238,7 @@ function calculateConfidence(input: EmpathyInput): number {
   return Math.max(45, Math.min(95, Math.round(confidence)))
 }
 
-function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, confidence: number): string {
+function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, _confidence: number): string {
   const descriptor = moodDescriptors[mood]
   const parts: string[] = [descriptor]
 
@@ -253,8 +253,6 @@ function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, confidenc
   if (typeof input.energyLevel === "number") {
     parts.push(`Energy around ${input.energyLevel}/10.`)
   }
-
-  parts.push(`Confidence ~${confidence}%.`)
 
   return parts.join(" ")
 }

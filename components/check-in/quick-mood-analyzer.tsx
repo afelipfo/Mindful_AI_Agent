@@ -603,11 +603,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
                       ) : (
                         <p className="mt-1 text-sm text-text-secondary">Photo saved for this check-in.</p>
                       )}
-                      {imageAttachment.analysis?.confidence && (
-                        <p className="mt-2 text-xs text-text-muted">
-                          Confidence: {imageAttachment.analysis.confidence}%
-                        </p>
-                      )}
                     </div>
                     <Button
                       variant="ghost"
@@ -648,9 +643,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
               <div className="rounded-lg border border-border bg-background/80 p-4">
                 <p className="text-sm font-medium text-text-primary">Text insight</p>
                 <p className="mt-1 text-sm text-text-secondary">{textAnalysis.summary}</p>
-                <p className="mt-2 text-xs text-text-muted">
-                  Mood: {textAnalysis.moodLabel} · Confidence: {textAnalysis.confidence}%
-                </p>
+                <p className="mt-2 text-xs text-text-muted">Mood: {textAnalysis.moodLabel}</p>
               </div>
             )}
 
