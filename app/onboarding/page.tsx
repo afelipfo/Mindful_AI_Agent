@@ -96,33 +96,33 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const onboardingQuestions = [
   {
     question:
-      "Hi there! I'm your Mindful AI companion. Let's get to know each other. Can you tell me a bit about your daily routine? What does a typical day look like for you?",
-    placeholder: "Tell me about your daily routine...",
+      "Hi, I'm Mindful—your companion here. Could you walk me through what a typical day feels like for you right now?",
+    placeholder: "Tell me about the flow of a usual day...",
   },
   {
     question:
-      "Thanks for sharing! Now, how are you feeling today? On a scale of 1-10, what's your mood and energy level? Are you experiencing any physical symptoms?",
-    placeholder: "Describe your current mood and energy...",
+      "Thanks for painting that picture. Checking in at this moment, how would you rate your mood and energy from 1-10? Feel free to mention any physical sensations you notice.",
+    placeholder: "Share how your mood and energy feel today...",
   },
   {
     question:
-      "I appreciate you opening up. What events, people, or situations tend to affect your mood the most? These could be positive or negative triggers.",
-    placeholder: "Share what affects your mood...",
+      "Appreciate the reflection. Are there people, places, or situations that reliably lift you up—or weigh you down?",
+    placeholder: "Let me know what tends to raise or lower your mood...",
   },
   {
     question:
-      "That's helpful to know. What strategies do you currently use to manage your emotions? This could be anything from exercise to talking with friends.",
-    placeholder: "Describe your coping mechanisms...",
+      "That insight helps a lot. When you need to reset or steady yourself, what habits, practices, or support systems do you lean on?",
+    placeholder: "Describe the strategies that help you cope...",
   },
   {
     question:
-      "Great! What are your main wellness goals? Are you looking to improve sleep, reduce anxiety, manage stress, or something else?",
-    placeholder: "Share your wellness goals...",
+      "You're doing great. What personal wellness goals feel most important to you at the moment?",
+    placeholder: "Share the goals you want to focus on...",
   },
   {
     question:
-      "Finally, what types of support work best for you? Do you prefer meditation, exercise, journaling, or other activities?",
-    placeholder: "Tell me your preferences...",
+      "Last step! What types of support usually resonate with you—guided practices, movement, journaling, quiet time, something else?",
+    placeholder: "Tell me what kinds of support feel good for you...",
   },
 ]
 
@@ -483,7 +483,7 @@ export default function OnboardingPage() {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content:
-            "Thank you for sharing! I now have a good understanding of your wellness journey. Here are some personalized recommendations for you.",
+            "Thank you for opening up with me. I have what I need to tailor your wellness plan—here are the suggestions I prepared for you.",
         }
         setMessages((prev) => [...prev, completionMessage])
 
@@ -1006,7 +1006,6 @@ export default function OnboardingPage() {
             onSendMessage={handleSendMessage}
             placeholder={onboardingQuestions[currentStepIndex]?.placeholder || "Type your response..."}
             isLoading={isLoading}
-            enableMultimodal
           />
         )}
       </div>

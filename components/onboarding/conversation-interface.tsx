@@ -2,20 +2,13 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { Send, Brain, MessageSquare, Mic, Smile, Camera } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Send, Brain } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TextJournal } from "@/components/check-in/text-journal"
-import { VoiceRecorder } from "@/components/check-in/voice-recorder"
-import { EmojiSelector } from "@/components/check-in/emoji-selector"
-import { PhotoCapture } from "@/components/check-in/photo-capture"
 import { cn } from "@/lib/utils"
-import { uploadAudio, uploadImage } from "@/lib/upload"
-import { useToast } from "@/hooks/use-toast"
 import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
 
 interface ConversationInterfaceProps {
@@ -23,7 +16,6 @@ interface ConversationInterfaceProps {
   onSendMessage: (message: string, type?: MessageType, metadata?: MessageMetadata) => void
   placeholder?: string
   isLoading?: boolean
-  enableMultimodal?: boolean
 }
 
 export function ConversationInterface({
@@ -31,15 +23,10 @@ export function ConversationInterface({
   onSendMessage,
   placeholder = "Type your response...",
   isLoading = false,
-  enableMultimodal = false,
 }: ConversationInterfaceProps) {
   const [input, setInput] = useState("")
-  const [activeTab, setActiveTab] = useState("text")
-  const [textJournalValue, setTextJournalValue] = useState("")
-  const [, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { toast } = useToast()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -49,165 +36,41 @@ export function ConversationInterface({
     scrollToBottom()
   }, [messages])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (input.trim() && !isLoading) {
-      onSendMessage(input.trim(), "text")
-      setInput("")
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "56px"
-      }
+  const sendCurrentInput = () => {
+    const trimmed = input.trim()
+    if (!trimmed || isLoading) {
+      return
+    }
+    onSendMessage(trimmed, "text")
+    setInput("")
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "56px"
     }
   }
 
-  const handleTextJournalSubmit = () => {
-    if (textJournalValue.trim() && !isLoading) {
-      onSendMessage(textJournalValue.trim(), "text")
-      setTextJournalValue("")
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    sendCurrentInput()
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      sendCurrentInput()
     }
   }
 
-  const handleVoiceComplete = (_audioBlob: Blob) => {
-    // This is called when recording is stopped, but we don't send yet
-  }
-
-  const handleVoiceSend = async (audioBlob: Blob) => {
-    try {
-      setIsUploading(true)
-      toast({
-        title: "Uploading audio...",
-        description: "Please wait while we process your recording",
-      })
-
-      const audioUrl = await uploadAudio(audioBlob)
-      let metadata: MessageMetadata = { audioUrl }
-      let content = "Voice recording captured"
-
-      try {
-        const analysisResponse = await fetch("/api/analyze/voice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audioUrl }),
-        })
-
-        if (analysisResponse.ok) {
-          const analysis = await analysisResponse.json()
-          content = analysis.transcript ? `Voice note: ${analysis.transcript}` : content
-          metadata = {
-            ...metadata,
-            transcript: analysis.transcript,
-            label: typeof analysis.moodLabel === "string" ? analysis.moodLabel.toLowerCase() : undefined,
-            value: analysis.moodScore,
-            energy: analysis.energyLevel,
-            emotions: analysis.emotions,
-            summary: analysis.summary,
-          }
-        } else {
-          console.error("Voice analysis failed", await analysisResponse.json().catch(() => ({})))
-        }
-      } catch (analysisError) {
-        console.error("Voice analysis error:", analysisError)
-      }
-
-      onSendMessage(content, "voice", metadata)
-
-      toast({
-        title: "Voice note ready",
-        description: "We transcribed your recording and added it to the conversation.",
-      })
-    } catch (error) {
-      console.error("Failed to upload audio:", error)
-      toast({
-        title: "❌ Upload failed",
-        description: "Failed to upload audio. Please try again.",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const handleEmojiSelect = (emoji: string, label: string, value: number, note?: string) => {
-    const message = note ? `Feeling ${label}: ${note}` : `Feeling ${label}`
-    onSendMessage(message, "emoji", { emoji, label, value, note })
-  }
-
-  const handlePhotoCapture = (_file: File) => {
-    // This is called when photo is selected, but we don't send yet
-  }
-
-  const handlePhotoSend = async (file: File) => {
-    try {
-      setIsUploading(true)
-      toast({
-        title: "Uploading photo...",
-        description: "Please wait while we process your image",
-      })
-
-      const photoUrl = await uploadImage(file)
-      let metadata: MessageMetadata = { photoUrl }
-      let content = "Photo captured"
-
-      try {
-        const analysisResponse = await fetch("/api/analyze/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: photoUrl }),
-        })
-
-        if (analysisResponse.ok) {
-          const analysis = await analysisResponse.json()
-          content = analysis.summary ? analysis.summary : `Photo mood: ${analysis.moodLabel}`
-          metadata = {
-            ...metadata,
-            label: typeof analysis.moodLabel === "string" ? analysis.moodLabel.toLowerCase() : undefined,
-            confidence: analysis.confidence,
-            emotions: analysis.emotions,
-            summary: analysis.summary,
-          }
-        } else {
-          console.error("Image analysis failed", await analysisResponse.json().catch(() => ({})))
-        }
-      } catch (analysisError) {
-        console.error("Image analysis error:", analysisError)
-      }
-
-      onSendMessage(content, "photo", metadata)
-
-      toast({
-        title: "Photo analyzed",
-        description: "We added emotional cues from your snapshot.",
-      })
-    } catch (error) {
-      console.error("Failed to upload photo:", error)
-      toast({
-        title: "❌ Upload failed",
-        description: "Failed to upload photo. Please try again.",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
-    }
-  }
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-    // Auto-resize textarea
-    e.target.style.height = "56px"
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`
+  const handleTextareaChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value)
+    event.target.style.height = "56px"
+    event.target.style.height = `${Math.min(event.target.scrollHeight, 200)}px`
   }
 
   return (
-    <div className="flex flex-1 flex-col h-full">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4">
+    <div className="flex h-full flex-1 flex-col">
+      <div className="flex-1 space-y-4 overflow-y-auto p-6 md:p-8">
         {messages.map((message) => (
-          <div key={message.id} className={cn("flex gap-3 items-start", message.role === "user" && "flex-row-reverse")}>
+          <div key={message.id} className={cn("flex items-start gap-3", message.role === "user" && "flex-row-reverse")}>
             <Avatar className="h-9 w-9 flex-shrink-0">
               <AvatarFallback
                 className={message.role === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted"}
@@ -219,12 +82,12 @@ export function ConversationInterface({
               className={cn(
                 "max-w-[80%] rounded-2xl px-5 py-4 transition-all duration-300",
                 message.role === "user"
-                  ? "bg-primary text-primary-foreground rounded-br-sm"
-                  : "bg-card border border-border rounded-bl-sm",
+                  ? "rounded-br-sm bg-primary text-primary-foreground"
+                  : "rounded-bl-sm border border-border bg-card",
               )}
             >
-              {message.metadata?.emoji && <div className="text-3xl mb-2">{message.metadata.emoji}</div>}
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              {message.metadata?.emoji && <div className="mb-2 text-3xl">{message.metadata.emoji}</div>}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
 
               {message.metadata?.transcript && (
                 <p className="mt-2 text-xs italic text-primary-foreground/80 sm:text-text-secondary">
@@ -240,9 +103,7 @@ export function ConversationInterface({
 
               {(message.metadata?.audioUrl || message.metadata?.photoUrl) && (
                 <div className="mt-3 space-y-3">
-                  {message.metadata.audioUrl && (
-                    <audio controls className="w-full" src={message.metadata.audioUrl} />
-                  )}
+                  {message.metadata.audioUrl && <audio controls className="w-full" src={message.metadata.audioUrl} />}
                   {message.metadata.photoUrl && (
                     <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border">
                       <Image
@@ -258,22 +119,23 @@ export function ConversationInterface({
             </div>
           </div>
         ))}
+
         {isLoading && (
-          <div className="flex gap-3 items-start">
+          <div className="flex items-start gap-3">
             <Avatar className="h-9 w-9 flex-shrink-0">
               <AvatarFallback className="bg-primary text-primary-foreground">
                 <Brain className="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
-            <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-5 py-4">
+            <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-5 py-4">
               <div className="flex gap-1">
-                <div className="h-2 w-2 rounded-full bg-text-muted animate-breathe" style={{ animationDelay: "0ms" }} />
+                <div className="h-2 w-2 animate-breathe rounded-full bg-text-muted" style={{ animationDelay: "0ms" }} />
                 <div
-                  className="h-2 w-2 rounded-full bg-text-muted animate-breathe"
+                  className="h-2 w-2 animate-breathe rounded-full bg-text-muted"
                   style={{ animationDelay: "200ms" }}
                 />
                 <div
-                  className="h-2 w-2 rounded-full bg-text-muted animate-breathe"
+                  className="h-2 w-2 animate-breathe rounded-full bg-text-muted"
                   style={{ animationDelay: "400ms" }}
                 />
               </div>
@@ -283,72 +145,22 @@ export function ConversationInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
       <div className="sticky bottom-0 border-t border-border bg-background p-6">
-        {enableMultimodal ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
-              <TabsTrigger value="text" className="gap-2">
-                <MessageSquare className="h-4 w-4" />
-                <span className="hidden sm:inline">Text</span>
-              </TabsTrigger>
-              <TabsTrigger value="voice" className="gap-2">
-                <Mic className="h-4 w-4" />
-                <span className="hidden sm:inline">Voice</span>
-              </TabsTrigger>
-              <TabsTrigger value="emoji" className="gap-2">
-                <Smile className="h-4 w-4" />
-                <span className="hidden sm:inline">Emoji</span>
-              </TabsTrigger>
-              <TabsTrigger value="photo" className="gap-2">
-                <Camera className="h-4 w-4" />
-                <span className="hidden sm:inline">Photo</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="text" className="mt-0">
-              <div className="space-y-3">
-                <TextJournal value={textJournalValue} onChange={setTextJournalValue} onSubmit={handleTextJournalSubmit} />
-                <Button
-                  onClick={handleTextJournalSubmit}
-                  disabled={!textJournalValue.trim() || isLoading}
-                  className="w-full"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Response
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="voice" className="mt-0">
-              <VoiceRecorder onRecordingComplete={handleVoiceComplete} onSend={handleVoiceSend} />
-            </TabsContent>
-
-            <TabsContent value="emoji" className="mt-0">
-              <EmojiSelector onSelect={handleEmojiSelect} />
-            </TabsContent>
-
-            <TabsContent value="photo" className="mt-0">
-              <PhotoCapture onPhotoCapture={handlePhotoCapture} onSend={handlePhotoSend} />
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex gap-3 items-end">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className="min-h-[56px] max-h-[200px] resize-none"
-              disabled={isLoading}
-            />
-            <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0" disabled={!input.trim() || isLoading}>
-              <Send className="h-4 w-4" />
-              <span className="sr-only">Send message</span>
-            </Button>
-          </form>
-        )}
+        <form onSubmit={handleSubmit} className="flex items-end gap-3">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="min-h-[56px] max-h-[200px] resize-none"
+            disabled={isLoading}
+          />
+          <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0" disabled={!input.trim() || isLoading}>
+            <Send className="h-4 w-4" />
+            <span className="sr-only">Send message</span>
+          </Button>
+        </form>
       </div>
     </div>
   )
