@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { GoalManager } from "@/components/dashboard/goal-manager"
 import { MoodEntryHistory } from "@/components/dashboard/mood-entry-history"
 import { aggregateEnergyByEntries } from "@/lib/analytics"
+import { Header } from "@/components/layout/header"
 
 // Dynamically import heavy components
 const EmpathyRecommendations = dynamicImport(
@@ -638,7 +639,9 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col md:flex-row overflow-hidden bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
+      <Header />
+
       <div className="md:hidden border-b border-border p-4">
         <Button asChild variant="ghost" size="sm">
           <Link href="/">
@@ -648,9 +651,10 @@ export default function OnboardingPage() {
         </Button>
       </div>
 
-      {!isCompleted && <ProgressSidebar currentStep={currentStepIndex + 1} steps={steps} />}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {!isCompleted && <ProgressSidebar currentStep={currentStepIndex + 1} steps={steps} />}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
         <div className="hidden md:flex border-b border-border p-4">
           <Button asChild variant="ghost" size="sm">
             <Link href="/">
@@ -1007,5 +1011,6 @@ export default function OnboardingPage() {
         )}
       </div>
     </div>
-  )
+  </div>
+)
 }
