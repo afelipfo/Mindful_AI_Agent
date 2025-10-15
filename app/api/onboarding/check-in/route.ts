@@ -3,8 +3,7 @@ import { z, ZodError } from "zod"
 import { getServerSession } from "next-auth"
 import { withRateLimit } from "@/lib/api-middleware"
 import { authOptions } from "@/lib/auth"
-import { createAdminClient, tryCreateAdminClient } from "@/lib/supabase/admin"
-import { createClient as createServerClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 const metadataSchema = z
   .object({
@@ -69,108 +68,78 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id
-    const adminClient = tryCreateAdminClient()
     const filteredResponses = payload.responses.filter((response) => response.response.trim().length > 0)
 
-    if (adminClient) {
-      const { error: rpcError } = await adminClient.rpc("process_onboarding_check_in", {
-        p_user_id: userId,
-        p_responses: filteredResponses,
-        p_mood_entry: {
-          ...payload.moodEntry,
-          entryType:
-            payload.moodEntry.entryType === "voice" ||
-            payload.moodEntry.entryType === "emoji" ||
-            payload.moodEntry.entryType === "photo"
-              ? payload.moodEntry.entryType
-              : "text",
-          timestamp: new Date().toISOString(),
-        },
-        p_summary: payload.summary ?? null,
-      })
+    const supabase = createAdminClient()
 
-      if (rpcError) {
-        throw rpcError
+    if (filteredResponses.length > 0) {
+      const { error: responsesError } = await supabase
+        .from("onboarding_responses")
+        .upsert(
+          filteredResponses.map((response) => ({
+            user_id: userId,
+            step: response.step,
+            step_title: response.stepTitle,
+            response: response.response,
+            metadata: response.metadata ?? null,
+          })),
+          { onConflict: "user_id,step" },
+        )
+
+      if (responsesError) {
+        throw responsesError
       }
-
-      await adminClient
-        .from("profiles")
-        .update({ onboarding_completed: true })
-        .eq("id", userId)
-    } else {
-      const supabase = await createServerClient()
-
-      if (filteredResponses.length > 0) {
-        const { error: responsesError } = await supabase
-          .from("onboarding_responses")
-          .upsert(
-            filteredResponses.map((response) => ({
-              user_id: userId,
-              step: response.step,
-              step_title: response.stepTitle,
-              response: response.response,
-              metadata: response.metadata ?? null,
-            })),
-            { onConflict: "user_id,step" },
-          )
-
-        if (responsesError) {
-          throw responsesError
-        }
-      }
-
-      const moodScore = Math.max(1, Math.min(10, Math.round(payload.moodEntry.moodScore)))
-      const energyLevel = Math.max(1, Math.min(10, Math.round(payload.moodEntry.energyLevel)))
-      const entryType =
-        payload.moodEntry.entryType === "voice" ||
-        payload.moodEntry.entryType === "emoji" ||
-        payload.moodEntry.entryType === "photo"
-          ? payload.moodEntry.entryType
-          : "text"
-      const moodDate = payload.moodEntry.date ?? new Date().toISOString().slice(0, 10)
-      const timestamp = payload.moodEntry.timestamp ?? new Date().toISOString()
-
-      const { error: moodError } = await supabase.from("mood_entries").insert({
-        user_id: userId,
-        date: moodDate,
-        mood_score: moodScore,
-        energy_level: energyLevel,
-        emotions: payload.moodEntry.emotions ?? [],
-        triggers: payload.moodEntry.triggers ?? [],
-        coping_strategies: payload.moodEntry.coping ?? [],
-        entry_type: entryType,
-        note: payload.moodEntry.note ?? null,
-        audio_url: payload.moodEntry.audioUrl ?? null,
-        photo_url: payload.moodEntry.photoUrl ?? null,
-        entry_timestamp: timestamp,
-      })
-
-      if (moodError) {
-        throw moodError
-      }
-
-      if (payload.summary?.analysisSummary) {
-        await supabase
-          .from("ai_insights")
-          .upsert(
-            {
-              user_id: userId,
-              insight_type: "recommendation",
-              title: `Mood insight${
-                payload.summary.detectedMood ? `: ${payload.summary.detectedMood}` : ""
-              }`,
-              description: payload.summary.analysisSummary,
-              action: "Review recommendations",
-            },
-            { onConflict: "user_id,description" },
-          )
-      }
-
-      await supabase
-        .from("profiles")
-        .update({ onboarding_completed: true })
-        .eq("id", userId)
     }
+
+    const moodScore = Math.max(1, Math.min(10, Math.round(payload.moodEntry.moodScore)))
+    const energyLevel = Math.max(1, Math.min(10, Math.round(payload.moodEntry.energyLevel)))
+    const entryType =
+      payload.moodEntry.entryType === "voice" ||
+      payload.moodEntry.entryType === "emoji" ||
+      payload.moodEntry.entryType === "photo"
+        ? payload.moodEntry.entryType
+        : "text"
+    const moodDate = payload.moodEntry.date ?? new Date().toISOString().slice(0, 10)
+    const timestamp = payload.moodEntry.timestamp ?? new Date().toISOString()
+
+    const { error: moodError } = await supabase.from("mood_entries").insert({
+      user_id: userId,
+      date: moodDate,
+      mood_score: moodScore,
+      energy_level: energyLevel,
+      emotions: payload.moodEntry.emotions ?? [],
+      triggers: payload.moodEntry.triggers ?? [],
+      coping_strategies: payload.moodEntry.coping ?? [],
+      entry_type: entryType,
+      note: payload.moodEntry.note ?? null,
+      audio_url: payload.moodEntry.audioUrl ?? null,
+      photo_url: payload.moodEntry.photoUrl ?? null,
+      entry_timestamp: timestamp,
+    })
+
+    if (moodError) {
+      throw moodError
+    }
+
+    if (payload.summary?.analysisSummary) {
+      await supabase
+        .from("ai_insights")
+        .upsert(
+          {
+            user_id: userId,
+            insight_type: "recommendation",
+            title: `Mood insight${payload.summary.detectedMood ? `: ${payload.summary.detectedMood}` : ""}`,
+            description: payload.summary.analysisSummary,
+            action: "Review recommendations",
+          },
+          { onConflict: "user_id,description" },
+        )
+    }
+
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("id", userId)
 
     return NextResponse.json({ success: true })
   } catch (error) {
