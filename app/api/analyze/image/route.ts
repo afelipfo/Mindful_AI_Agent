@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
 import { withRateLimit } from "@/lib/api-middleware"
+import { inferMoodFromText } from "@/lib/empathy-agent"
 
 export const runtime = "nodejs"
 
@@ -13,6 +14,75 @@ interface ImageAnalysis {
   confidence: number
   emotions: string[]
   summary: string
+}
+
+const allowedMoods = new Set(["anxious", "happy", "sad", "tired", "stressed", "excited"])
+
+const moodAliasMap: Record<string, string> = {
+  nervous: "anxious",
+  worried: "anxious",
+  uneasy: "anxious",
+  overwhelmed: "anxious",
+  tense: "anxious",
+  calm: "happy",
+  relaxed: "happy",
+  neutral: "tired",
+  peaceful: "happy",
+  content: "happy",
+  joyful: "happy",
+  smiling: "happy",
+  delighted: "happy",
+  serene: "happy",
+  gloomy: "sad",
+  melancholic: "sad",
+  blue: "sad",
+  downcast: "sad",
+  exhausted: "tired",
+  sleepy: "tired",
+  drained: "tired",
+  fatigued: "tired",
+  burnedout: "tired",
+  angry: "stressed",
+  frustrated: "stressed",
+  irritated: "stressed",
+  pressured: "stressed",
+  hyped: "excited",
+  energized: "excited",
+  thrilled: "excited",
+  excited: "excited",
+  playful: "excited",
+  bored: "tired",
+}
+
+function normalizeMoodLabel(rawLabel: unknown, context?: string): string {
+  if (typeof rawLabel === "string") {
+    const lowered = rawLabel.toLowerCase().trim()
+    if (allowedMoods.has(lowered)) {
+      return lowered
+    }
+
+    const aliasKey = lowered.replace(/[\s-]/g, "")
+    if (moodAliasMap[aliasKey]) {
+      return moodAliasMap[aliasKey]
+    }
+  }
+
+  if (typeof context === "string" && context.trim().length > 0) {
+    const inference = inferMoodFromText(context)
+    return inference.mood
+  }
+
+  return "tired"
+}
+
+function normalizeEmotions(emotions: unknown): string[] {
+  if (!Array.isArray(emotions)) {
+    return []
+  }
+  const cleaned = emotions
+    .map((emotion) => (typeof emotion === "string" ? emotion.toLowerCase().trim() : null))
+    .filter((emotion): emotion is string => !!emotion && emotion.length > 0)
+  return Array.from(new Set(cleaned)).slice(0, 6)
 }
 
 async function analyzeImage(url: string): Promise<ImageAnalysis> {
@@ -34,7 +104,7 @@ async function analyzeImage(url: string): Promise<ImageAnalysis> {
         {
           role: "system",
           content:
-            "You analyze a user's selfie or mood snapshot. Return JSON with fields: moodLabel (anxious, happy, sad, tired, stressed, excited, neutral), confidence (0-100), emotions (array of up to 4 descriptors), summary (<= 120 characters, compassionate tone). Focus on emotional cues, not appearance judgments.",
+            "You analyze a user's selfie or mood snapshot. Always output strict JSON with keys: moodLabel (choose exactly from anxious, happy, sad, tired, stressed, excited), confidence (0-100 number), emotions (array of <=5 lowercase descriptors), summary (<= 120 characters, compassionate tone). Focus on emotional cues from facial expression, posture, and lighting. Avoid appearance commentary. If unsure, select tired as the closest calm baseline.",
         },
         {
           role: "user",
@@ -60,8 +130,12 @@ async function analyzeImage(url: string): Promise<ImageAnalysis> {
     parsed = {}
   }
 
-  const normalizedLabel =
-    typeof parsed.moodLabel === "string" ? parsed.moodLabel.toLowerCase() : "neutral"
+  const normalizedLabel = normalizeMoodLabel(parsed.moodLabel, parsed.summary)
+  const normalizedEmotions = normalizeEmotions(parsed.emotions)
+  const summaryText =
+    typeof parsed.summary === "string"
+      ? parsed.summary
+      : "Image captured. We'll consider it alongside your reflections."
 
   return {
     moodLabel: normalizedLabel,
@@ -69,11 +143,8 @@ async function analyzeImage(url: string): Promise<ImageAnalysis> {
       typeof parsed.confidence === "number" && !Number.isNaN(parsed.confidence)
         ? Math.max(0, Math.min(100, parsed.confidence))
         : 55,
-    emotions: Array.isArray(parsed.emotions) ? parsed.emotions : [],
-    summary:
-      typeof parsed.summary === "string"
-        ? parsed.summary
-        : "Image captured. We'll consider it alongside your reflections.",
+    emotions: normalizedEmotions,
+    summary: summaryText,
   }
 }
 

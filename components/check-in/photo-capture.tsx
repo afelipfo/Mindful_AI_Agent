@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Camera, Upload, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
@@ -17,52 +17,100 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
   const [capturedFile, setCapturedFile] = useState<File | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [hasCamera, setHasCamera] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isCameraActive, setIsCameraActive] = useState(false)
-  const [stream, setStream] = useState<MediaStream | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsCameraActive(false)
+  }, [])
 
   useEffect(() => {
-    // Detect if device supports camera capture
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     setIsMobile(isMobileDevice)
 
-    // Check for camera availability
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(() => setHasCamera(true))
-        .catch(() => setHasCamera(false))
-    }
-  }, [])
+    let isMounted = true
 
-  const startCamera = async () => {
+    const detectCamera = async () => {
+      try {
+        if (!navigator.mediaDevices) {
+          setHasCamera(false)
+          return
+        }
+        if (!navigator.mediaDevices.enumerateDevices) {
+          setHasCamera(!!navigator.mediaDevices.getUserMedia)
+          return
+        }
+
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        if (isMounted) {
+          setHasCamera(devices.some((device) => device.kind === "videoinput"))
+        }
+      } catch (error) {
+        console.warn("Unable to enumerate media devices:", error)
+        if (isMounted) {
+          setHasCamera(!!navigator.mediaDevices?.getUserMedia)
+        }
+      }
+    }
+
+    detectCamera()
+
+    return () => {
+      isMounted = false
+      stopCamera()
+    }
+  }, [stopCamera])
+
+  const startCamera = useCallback(async () => {
+    setCameraError(null)
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera not supported in this browser")
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       })
-      setStream(mediaStream)
+      streamRef.current = mediaStream
       setIsCameraActive(true)
+      setPreview(null)
+      setCapturedFile(null)
 
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-        videoRef.current.play()
+        const video = videoRef.current
+        video.srcObject = mediaStream
+        const playPromise = video.play()
+        if (playPromise && typeof playPromise.then === "function") {
+          playPromise.catch((playError) => {
+            console.warn("Camera preview was prevented from autoplaying:", playError)
+            setCameraError("Press the preview to start the camera if it stays paused.")
+          })
+        }
       }
     } catch (error) {
-      console.error('Error accessing camera:', error)
-      // Fallback to file input
+      console.error("Error accessing camera:", error)
+      setCameraError("No pudimos acceder a tu cámara. Revisa permisos o usa 'Select Photo'.")
+      stopCamera()
+      // Fallback to file input for devices that support capture attribute
       cameraInputRef.current?.click()
     }
-  }
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-      setStream(null)
-    }
-    setIsCameraActive(false)
-  }
+  }, [stopCamera])
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
@@ -71,6 +119,11 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
       const context = canvas.getContext('2d')
 
       if (context) {
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          setCameraError("La cámara todavía se está iniciando. Intenta capturar nuevamente en un momento.")
+          return
+        }
+
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         context.drawImage(video, 0, 0)
@@ -84,6 +137,8 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
 
         stopCamera()
       }
+    } else {
+      setCameraError("No se pudo capturar la foto. Intenta reiniciar la cámara.")
     }
   }
 
@@ -103,6 +158,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
       reader.onloadend = () => {
         setPreview(reader.result as string)
       }
+      setCameraError(null)
       reader.readAsDataURL(file)
       setCapturedFile(file)
       onPhotoCapture?.(file)
@@ -118,6 +174,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
     setPreview(null)
     setCapturedFile(null)
     stopCamera() // Also stop camera if active
+    setCameraError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -176,7 +233,7 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={handleSendPhoto} className="w-full max-w-md">
+          <Button onClick={handleSendPhoto} className="w-full max-w-md" disabled={!capturedFile}>
             <Send className="h-4 w-4 mr-2" />
             Send Photo
           </Button>
@@ -228,6 +285,9 @@ export function PhotoCapture({ onPhotoCapture, onSend }: PhotoCaptureProps) {
         className="hidden"
         aria-label="Upload photo"
       />
+      {cameraError && (
+        <p className="text-sm text-danger text-center">{cameraError}</p>
+      )}
     </div>
   )
 }

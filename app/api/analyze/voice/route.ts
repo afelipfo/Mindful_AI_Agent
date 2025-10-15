@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
 import { withRateLimit } from "@/lib/api-middleware"
 import { inferMoodFromText } from "@/lib/empathy-agent"
+import { Buffer } from "node:buffer"
 
 export const runtime = "nodejs"
 
@@ -26,13 +27,25 @@ async function transcribeAudio(url: string): Promise<string> {
   let audioBuffer: ArrayBuffer
 
   // Handle data URLs (for local development)
-  if (url.startsWith('data:')) {
-    const base64Data = url.split(',')[1]
-    const binaryString = atob(base64Data)
-    audioBuffer = new ArrayBuffer(binaryString.length)
-    const bytes = new Uint8Array(audioBuffer)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
+  let contentType = "audio/wav"
+
+  if (url.startsWith("data:")) {
+    const [metadata, base64Payload] = url.split(",")
+    if (!base64Payload) {
+      throw new Error("Invalid audio data URL")
+    }
+    const dataBuffer = Buffer.from(base64Payload, "base64")
+    const slicedBuffer = dataBuffer.buffer.slice(
+      dataBuffer.byteOffset,
+      dataBuffer.byteOffset + dataBuffer.byteLength,
+    )
+    audioBuffer = slicedBuffer
+
+    if (metadata) {
+      const match = metadata.match(/^data:(.*?);/)
+      if (match?.[1]) {
+        contentType = match[1]
+      }
     }
   } else {
     // Handle regular URLs
@@ -41,12 +54,11 @@ async function transcribeAudio(url: string): Promise<string> {
       throw new Error("Failed to retrieve audio file")
     }
     audioBuffer = await audioResponse.arrayBuffer()
-  }
 
-  // Determine content type
-  let contentType = "audio/wav"
-  if (url.startsWith('data:')) {
-    contentType = url.split(';')[0].split(':')[1]
+    const responseContentType = audioResponse.headers.get("content-type")
+    if (responseContentType) {
+      contentType = responseContentType
+    }
   }
 
   const blob = new Blob([audioBuffer], { type: contentType })
