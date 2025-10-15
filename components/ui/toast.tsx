@@ -121,6 +121,7 @@ export interface ToastProps {
   action?: ToastActionElement
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  variant?: "default" | "destructive"
 }
 
 export {
