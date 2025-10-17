@@ -3,6 +3,7 @@
 import dynamicImport from "next/dynamic"
 import { format } from "date-fns"
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, BarChart3, Sparkles, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -109,7 +110,14 @@ export function OnboardingResults({
   onDismissInsight,
   todayLabel,
 }: OnboardingResultsProps) {
+  const router = useRouter()
   const todayDisplay = useMemo(() => todayLabel ?? format(new Date(), "EEEE, MMMM d, yyyy"), [todayLabel])
+
+  const handleDismissRecommendations = () => {
+    // Switch to dashboard tab and redirect to home page
+    onTabChange("dashboard")
+    router.push("/")
+  }
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="h-full">
@@ -147,10 +155,17 @@ export function OnboardingResults({
             )}
             <EmpathyRecommendations
               recommendation={empathyData}
-              onDismiss={() => {
-                onTabChange("dashboard")
-              }}
+              onDismiss={handleDismissRecommendations}
             />
+            <div className="mx-auto max-w-3xl px-4 pb-8">
+              <Button
+                onClick={handleDismissRecommendations}
+                size="lg"
+                className="w-full sm:w-auto"
+              >
+                Continue to Dashboard
+              </Button>
+            </div>
           </div>
         )}
       </TabsContent>
