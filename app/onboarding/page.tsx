@@ -485,24 +485,14 @@ export default function OnboardingPage() {
 
         toast({
           title: "Onboarding complete!",
-          description: "Your wellness plan has been created. Redirecting to your dashboard...",
+          description: "Your wellness plan has been created. Review your personalized insights below.",
         })
-
-        // Redirect to home page after a short delay
-        setTimeout(() => {
-          console.log("[mindful-ai] handleFlowComplete: Redirecting to home...")
-          router.push("/")
-        }, 3000)
       } catch (error) {
         console.error("[mindful-ai] onboarding flow completion error:", error)
         toast({
-          title: "Onboarding saved",
-          description: "Your responses have been saved. Redirecting to dashboard...",
+          title: "Onboarding complete",
+          description: "Your responses have been saved. Review your insights below.",
         })
-        // Still redirect even if there's an error
-        setTimeout(() => {
-          router.push("/")
-        }, 2000)
       }
     },
     [persistCheckIn, toast, router],

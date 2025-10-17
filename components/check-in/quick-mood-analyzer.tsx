@@ -260,61 +260,10 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
     }
   }
 
-  const handlePhotoSend = async (file: File) => {
-    try {
-      setIsUploadingImage(true)
-      toast({
-        title: "Uploading photo...",
-        description: "We are processing your snapshot",
-      })
-
-      const photoUrl = await uploadImage(file)
-
-      try {
-        const response = await fetch("/api/analyze/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: photoUrl }),
-        })
-
-        if (response.ok) {
-          const analysis = (await response.json()) as ImageAnalysis
-          setImageAttachment({ url: photoUrl, analysis })
-          toast({
-            title: "Photo analyzed",
-            description: analysis.summary || "We added mood cues from your photo.",
-          })
-        } else {
-          console.error("Image analysis failed", await response.json().catch(() => ({})))
-          setImageAttachment({ url: photoUrl })
-          toast({
-            title: "Photo saved",
-            description: "We couldn't analyze it right now, but it's attached.",
-          })
-        }
-      } catch (analysisError) {
-        console.error("Image analysis error:", analysisError)
-        setImageAttachment({ url: photoUrl })
-        toast({
-          title: "Photo saved",
-          description: "We couldn't analyze it right now, but it's attached.",
-        })
-      }
-    } catch (error) {
-      console.error("Failed to upload photo:", error)
-      toast({
-        title: "Photo upload failed",
-        description: "Please try again with a different shot.",
-      })
-    } finally {
-      setIsUploadingImage(false)
-      setIsPhotoCaptureOpen(false)
-    }
-  }
 
   const handleAnalyze = async () => {
-    if (!input.trim() && !voiceAttachment && !imageAttachment) {
-      setError("Share a note, voice recording, or photo so we have something to reflect on.")
+    if (!input.trim() && !voiceAttachment) {
+      setError("Share a note or voice recording so we have something to reflect on.")
       return
     }
 
@@ -358,13 +307,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         console.log("[mindful-ai] No voice analysis available, voiceAttachment:", voiceAttachment)
       }
 
-      if (imageAttachment?.analysis) {
-        const { analysis } = imageAttachment
-        if (analysis.summary) {
-          contextSegments.push(`Image insight: ${analysis.summary}`)
-        }
-        ;(analysis.emotions ?? []).forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
-      }
 
       // Ensure context is never empty - use voice transcript or emotions as fallback
       let finalContext = contextSegments.length > 0 ? contextSegments.join("\n").slice(-2000) : input.trim()
@@ -421,19 +363,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         }
       }
 
-      if (imageAttachment?.analysis) {
-        const { analysis } = imageAttachment
-        payload.imageInsights = {
-          moodLabel: analysis.moodLabel,
-          confidence: analysis.confidence,
-          emotions: analysis.emotions,
-          summary: analysis.summary,
-        }
-
-        if (!payload.mood && analysis.moodLabel) {
-          payload.mood = analysis.moodLabel
-        }
-      }
 
       console.log("[mindful-ai] Sending empathy payload:", JSON.stringify(payload, null, 2))
 
@@ -456,7 +385,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         description: "We prepared a tailored support plan based on your reflection.",
       })
 
-      await persistQuickCheckIn(data, textInsights, voiceAttachment, imageAttachment, input)
+      await persistQuickCheckIn(data, textInsights, voiceAttachment, input)
     } catch (analysisError) {
       console.error("Mood analysis failed:", analysisError)
       setError(
@@ -475,9 +404,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
     setInput("")
     setTextAnalysis(null)
     setVoiceAttachment(null)
-    setImageAttachment(null)
     setIsVoiceRecorderOpen(false)
-    setIsPhotoCaptureOpen(false)
   }
 
   return (
@@ -523,15 +450,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
                       ? "Re-record voice note"
                       : "Add voice note"}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsPhotoCaptureOpen((prev) => !prev)}
-                  disabled={isUploadingImage || isAnalyzing}
-                >
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  {isPhotoCaptureOpen ? "Hide photo capture" : imageAttachment ? "Replace photo" : "Add photo"}
-                </Button>
               </div>
 
               {isVoiceRecorderOpen && (
@@ -540,11 +458,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
                 </div>
               )}
 
-              {isPhotoCaptureOpen && (
-                <div className="rounded-lg border border-dashed border-border/60 p-4">
-                  <PhotoCapture onSend={handlePhotoSend} />
-                </div>
-              )}
 
               {voiceAttachment && (
                 <div className="rounded-lg border border-border bg-background/80 p-4">
@@ -574,41 +487,19 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
                 </div>
               )}
 
-              {imageAttachment && (
-                <div className="rounded-lg border border-border bg-background/80 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">Photo attached</p>
-                      {imageAttachment.analysis?.summary ? (
-                        <p className="mt-1 text-sm text-text-secondary">{imageAttachment.analysis.summary}</p>
-                      ) : (
-                        <p className="mt-1 text-sm text-text-secondary">Photo saved for this check-in.</p>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setImageAttachment(null)}
-                      aria-label="Remove photo"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   onClick={handleReset}
-                  disabled={isAnalyzing || (!input && !voiceAttachment && !imageAttachment && !error)}
+                  disabled={isAnalyzing || (!input && !voiceAttachment && !error)}
                 >
                   Reset
                 </Button>
                 <Button
                   onClick={handleAnalyze}
                   disabled={
-                    isAnalyzing || (!input.trim() && !voiceAttachment && !imageAttachment) || isUploadingVoice || isUploadingImage
+                    isAnalyzing || (!input.trim() && !voiceAttachment) || isUploadingVoice
                   }
                 >
                   {isAnalyzing ? "Analyzing..." : "Analyze mood"}
@@ -641,12 +532,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
               </div>
             )}
 
-            {imageAttachment?.analysis?.summary && (
-              <div className="rounded-lg border border-border bg-background/80 p-4">
-                <p className="text-sm font-medium text-text-primary">Image insight</p>
-                <p className="mt-1 text-sm text-text-secondary">{imageAttachment.analysis.summary}</p>
-              </div>
-            )}
 
             <EmpathyRecommendations recommendation={result} onDismiss={() => setResult(null)} onReset={handleReset} />
           </div>
