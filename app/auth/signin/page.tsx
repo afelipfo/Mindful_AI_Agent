@@ -49,9 +49,18 @@ export default function SignInPage() {
           setError(`Authentication failed: ${result.error}`)
         }
       } else if (result?.ok) {
-        console.log("✅ Sign in successful, redirecting...")
+        console.log("✅ Sign in successful!")
+        console.log("🔄 Starting redirect to /onboarding...")
+
+        // Keep loading state true during redirect
         // Use window.location for a hard redirect to ensure session is properly loaded
-        window.location.href = "/onboarding"
+        setTimeout(() => {
+          console.log("🚀 Executing redirect now...")
+          window.location.href = "/onboarding"
+        }, 500)
+
+        // Don't set isLoading to false - let the redirect happen
+        return
       } else {
         console.log("⚠️ Unexpected result:", result)
         setError("Authentication failed. Please try again.")
