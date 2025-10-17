@@ -152,12 +152,18 @@ const buildEmpathyPayload = (
   conversation: ConversationMessage[],
   latestMetadata?: MessageMetadata,
 ): EmpathyRequestPayload => {
+  console.log("[mindful-ai] Building empathy payload from conversation:", conversation.length, "messages")
+
   const userMessages = conversation.filter((msg) => msg.role === "user")
+  console.log("[mindful-ai] User messages found:", userMessages.length)
+
   const textualNarrative = userMessages
     .filter((msg) => msg.type !== "emoji")
     .map((msg) => msg.content)
     .join("\n")
   const trimmedNarrative = textualNarrative.slice(-1000)
+
+  console.log("[mindful-ai] Textual narrative length:", textualNarrative.length)
 
   const emojiMessages = userMessages.filter(
     (msg) => msg.type === "emoji" && msg.metadata && typeof msg.metadata.label === "string",
@@ -173,11 +179,21 @@ const buildEmpathyPayload = (
     .map((msg) => (typeof msg.metadata?.value === "number" ? msg.metadata.value : null))
     .filter((value): value is number => value !== null)
 
+  // Ensure we ALWAYS have a valid context - critical for empathy generation!
+  let finalContext = trimmedNarrative || conversation[conversation.length - 1]?.content || ""
+
+  if (!finalContext && emotionLabels.length) {
+    finalContext = `Recent mood tags: ${emotionLabels.join(", ")}`
+  }
+
+  if (!finalContext) {
+    finalContext = "User completed onboarding questionnaire"
+  }
+
+  console.log("[mindful-ai] Final context:", finalContext.substring(0, 100) + "...")
+
   const payload: EmpathyRequestPayload = {
-    context:
-      trimmedNarrative ||
-      conversation[conversation.length - 1]?.content ||
-      (emotionLabels.length ? `Recent mood tags: ${emotionLabels.join(", ")}` : ""),
+    context: finalContext,
     emotions: Array.from(emotionSet),
     triggers: [],
     recentMoods: moodValues,
@@ -462,17 +478,27 @@ export default function OnboardingPage() {
       responsesByStep: Record<number, ConversationMessage>
       latestUserMessage: ConversationMessage | undefined
     }) => {
-      try {
-        console.log("[mindful-ai] handleFlowComplete: Starting...")
-        const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
+      console.log("[mindful-ai] handleFlowComplete: Starting...")
+      console.log("[mindful-ai] Conversation:", conversation)
+      console.log("[mindful-ai] ResponsesByStep:", responsesByStep)
 
-        console.log("[mindful-ai] handleFlowComplete: Fetching empathy recommendations...")
-        console.log("[mindful-ai] Empathy payload:", JSON.stringify(payload, null, 2))
+      const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
+      console.log("[mindful-ai] Empathy payload built:", JSON.stringify(payload, null, 2))
+
+      // ALWAYS generate empathy data - this is critical!
+      try {
+        console.log("[mindful-ai] Fetching empathy recommendations...")
         const empathy = await requestEmpathyRecommendations(payload)
         console.log("[mindful-ai] Empathy response received:", empathy)
+
+        if (!empathy) {
+          console.error("[mindful-ai] ❌ Empathy response is null!")
+          throw new Error("Empathy response is null")
+        }
+
         setEmpathyData(empathy)
         setActiveTab("empathy")
-        console.log("[mindful-ai] Empathy data set, activeTab set to empathy")
+        console.log("[mindful-ai] ✅ Empathy data set successfully!")
 
         if (empathy.warnings?.length) {
           toast({
@@ -481,35 +507,31 @@ export default function OnboardingPage() {
           })
         }
 
-        console.log("[mindful-ai] handleFlowComplete: Persisting check-in data...")
-        await persistCheckIn(conversation, payload, empathy, responsesByStep, latestUserMessage)
-
-        console.log("[mindful-ai] handleFlowComplete: Complete! Data saved successfully.")
+        // Try to persist, but don't fail if it errors
+        try {
+          console.log("[mindful-ai] Persisting check-in data...")
+          await persistCheckIn(conversation, payload, empathy, responsesByStep, latestUserMessage)
+          console.log("[mindful-ai] ✅ Data persisted successfully")
+        } catch (persistError) {
+          console.error("[mindful-ai] ⚠️ Failed to persist data:", persistError)
+          // Continue anyway - empathy data is already set
+        }
 
         toast({
           title: "Onboarding complete!",
           description: "Your wellness plan has been created. Review your personalized insights below.",
         })
       } catch (error) {
-        console.error("[mindful-ai] onboarding flow completion error:", error)
-
-        // Even if there's an error, try to generate basic empathy data
-        try {
-          const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
-          const empathy = await requestEmpathyRecommendations(payload)
-          setEmpathyData(empathy)
-          setActiveTab("empathy")
-        } catch (fallbackError) {
-          console.error("[mindful-ai] Fallback empathy generation failed:", fallbackError)
-        }
+        console.error("[mindful-ai] ❌ CRITICAL ERROR generating empathy:", error)
 
         toast({
-          title: "Onboarding complete",
-          description: "Your responses have been saved. Review your insights below.",
+          title: "Error generating recommendations",
+          description: error instanceof Error ? error.message : "Please try refreshing the page.",
+          variant: "destructive",
         })
       }
     },
-    [persistCheckIn, toast, router],
+    [persistCheckIn, toast],
   )
 
   const {

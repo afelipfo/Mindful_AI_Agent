@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
 
     if (!detectedMood) {
       console.error("[mindful-ai] Unable to determine mood - all detection methods failed")
-      return NextResponse.json({ error: "Unable to determine mood from input" }, { status: 400 })
+      console.error("[mindful-ai] Payload received:", JSON.stringify(validatedData, null, 2))
+      // Default to "tired" as a neutral mood instead of failing
+      detectedMood = "tired"
+      console.log("[mindful-ai] Defaulting to 'tired' mood")
     }
 
     if (typeof score !== "number") {
