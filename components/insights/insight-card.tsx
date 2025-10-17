@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, memo, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
@@ -10,9 +11,10 @@ import type { AIInsight } from "@/types/wellness"
 interface InsightCardProps {
   insight: AIInsight
   onDismiss?: (insight: AIInsight) => Promise<void> | void
+  onViewRecommendations?: () => void
 }
 
-export const InsightCard = memo(function InsightCard({ insight, onDismiss }: InsightCardProps) {
+export const InsightCard = memo(function InsightCard({ insight, onDismiss, onViewRecommendations }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -74,9 +76,18 @@ export const InsightCard = memo(function InsightCard({ insight, onDismiss }: Ins
               </button>
             )}
             <div className="mt-4 flex gap-2">
-              {insight.action && (
-                <Button size="sm" variant="outline" disabled={isPending}>
-                  {insight.action}
+              {onViewRecommendations && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(() => {
+                      onViewRecommendations()
+                    })
+                  }}
+                >
+                  View Recommendations
                 </Button>
               )}
               <Button

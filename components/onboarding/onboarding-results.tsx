@@ -332,7 +332,12 @@ export function OnboardingResults({
             <TabsContent value="all" className="space-y-4">
               {aiInsights.length > 0 ? (
                 aiInsights.map((insight, index) => (
-                  <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
+                  <InsightCard
+                    key={insight.id ?? index}
+                    insight={insight}
+                    onDismiss={onDismissInsight}
+                    onViewRecommendations={() => onTabChange("empathy")}
+                  />
                 ))
               ) : (
                 <Card className="p-8 text-center">
@@ -345,7 +350,12 @@ export function OnboardingResults({
             <TabsContent value="patterns" className="space-y-4">
               {patterns.length > 0 ? (
                 patterns.map((insight, index) => (
-                  <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
+                  <InsightCard
+                    key={insight.id ?? index}
+                    insight={insight}
+                    onDismiss={onDismissInsight}
+                    onViewRecommendations={() => onTabChange("empathy")}
+                  />
                 ))
               ) : (
                 <Card className="p-8 text-center">
@@ -358,7 +368,12 @@ export function OnboardingResults({
             <TabsContent value="recommendations" className="space-y-4">
               {recommendations.length > 0 ? (
                 recommendations.map((insight, index) => (
-                  <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
+                  <InsightCard
+                    key={insight.id ?? index}
+                    insight={insight}
+                    onDismiss={onDismissInsight}
+                    onViewRecommendations={() => onTabChange("empathy")}
+                  />
                 ))
               ) : (
                 <Card className="p-8 text-center">
@@ -371,7 +386,12 @@ export function OnboardingResults({
             <TabsContent value="alerts" className="space-y-4">
               {alerts.length > 0 ? (
                 alerts.map((insight, index) => (
-                  <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
+                  <InsightCard
+                    key={insight.id ?? index}
+                    insight={insight}
+                    onDismiss={onDismissInsight}
+                    onViewRecommendations={() => onTabChange("empathy")}
+                  />
                 ))
               ) : (
                 <Card className="p-8 text-center">
