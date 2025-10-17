@@ -1,20 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Brain, Loader2 } from "lucide-react"
 
-export default function SignInPage() {
-  const router = useRouter()
+function SignInForm() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
+  // Get callback URL from query params, default to /onboarding
+  const callbackUrl = searchParams.get("callbackUrl") || "/onboarding"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,21 +25,21 @@ export default function SignInPage() {
     setIsLoading(true)
 
     try {
-      console.log("🔐 Attempting to sign in with:", { email, password: "***" })
+      console.log("🔐 Attempting to sign in with:", { email, password: "***", callbackUrl })
 
+      // Use redirect: true to let NextAuth handle the redirect
       const result = await signIn("credentials", {
         email,
         password,
-        redirect: false,
+        callbackUrl,
+        redirect: false, // We'll handle redirect manually for better error handling
       })
 
       console.log("📋 Sign in result:", result)
-      console.log("📋 Result.ok:", result?.ok)
-      console.log("📋 Result.error:", result?.error)
-      console.log("📋 Result.url:", result?.url)
 
       if (result?.error) {
         console.error("❌ Sign in error:", result.error)
+        setIsLoading(false)
 
         // More specific error messages
         if (result.error.includes("Email not confirmed")) {
@@ -49,27 +52,19 @@ export default function SignInPage() {
           setError(`Authentication failed: ${result.error}`)
         }
       } else if (result?.ok) {
-        console.log("✅ Sign in successful!")
-        console.log("🔄 Starting redirect to /onboarding...")
+        console.log("✅ Sign in successful! Redirecting to:", callbackUrl)
 
-        // Keep loading state true during redirect
-        // Use window.location for a hard redirect to ensure session is properly loaded
-        setTimeout(() => {
-          console.log("🚀 Executing redirect now...")
-          window.location.href = "/onboarding"
-        }, 500)
-
-        // Don't set isLoading to false - let the redirect happen
-        return
+        // Force a full page reload to the callback URL
+        window.location.href = callbackUrl
       } else {
         console.log("⚠️ Unexpected result:", result)
+        setIsLoading(false)
         setError("Authentication failed. Please try again.")
       }
     } catch (error) {
       console.error("💥 Sign in exception:", error)
-      setError("An unexpected error occurred. Please try again.")
-    } finally {
       setIsLoading(false)
+      setError("An unexpected error occurred. Please try again.")
     }
   }
 
@@ -148,5 +143,22 @@ export default function SignInPage() {
         </div>
       </Card>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-sm text-text-secondary">Loading...</p>
+          </div>
+        </Card>
+      </div>
+    }>
+      <SignInForm />
+    </Suspense>
   )
 }
