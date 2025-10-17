@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, Suspense } from "react"
-import { signIn } from "next-auth/react"
-import { useSearchParams } from "next/navigation"
+import { useState, Suspense, useEffect } from "react"
+import { signIn, useSession } from "next-auth/react"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card"
 import { Brain, Loader2 } from "lucide-react"
 
 function SignInForm() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -18,6 +20,14 @@ function SignInForm() {
 
   // Get callback URL from query params, default to /onboarding
   const callbackUrl = searchParams.get("callbackUrl") || "/onboarding"
+
+  // If already authenticated, redirect immediately
+  useEffect(() => {
+    if (status === "authenticated") {
+      console.log("✅ Already authenticated, redirecting to:", callbackUrl)
+      window.location.href = callbackUrl
+    }
+  }, [status, callbackUrl])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,6 +48,34 @@ function SignInForm() {
     console.log("❌ Sign in failed - no redirect occurred")
     setIsLoading(false)
     setError("Authentication failed. Please check your credentials and try again.")
+  }
+
+  // Show loading while checking session
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-sm text-text-secondary">Checking authentication...</p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // If already authenticated, show redirecting message
+  if (status === "authenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-sm text-text-secondary">Redirecting...</p>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
