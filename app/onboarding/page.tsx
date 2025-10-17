@@ -319,29 +319,58 @@ export default function OnboardingPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState("empathy")
+  const [activeTab, setActiveTab] = useState("dashboard")
   const [empathyData, setEmpathyData] = useState<EmpathyResponse | null>(null)
   const [snapshot, setSnapshot] = useState<WellnessSnapshot>(getEmptyWellnessSnapshot())
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false)
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true)
 
-  // Load empathy data from sessionStorage on mount (only if onboarding was completed)
+  // Check if user has completed onboarding and load their data
   useEffect(() => {
-    const stored = sessionStorage.getItem("mindful-empathy-data")
-    const onboardingCompleted = sessionStorage.getItem("mindful-onboarding-completed")
-
-    if (stored && onboardingCompleted === "true") {
+    const checkOnboardingStatus = async () => {
       try {
-        const parsed = JSON.parse(stored) as EmpathyResponse
-        setEmpathyData(parsed)
-        setActiveTab("empathy")
-        console.log("[mindful-ai] Loaded empathy data from sessionStorage:", parsed)
+        setIsCheckingOnboarding(true)
+
+        // Check profile for onboarding completion status
+        const profileResponse = await fetch("/api/profile")
+        if (profileResponse.ok) {
+          const { profile } = await profileResponse.json()
+
+          if (profile.onboardingCompleted) {
+            console.log("[mindful-ai] User has completed onboarding, loading dashboard view")
+            setIsOnboardingCompleted(true)
+
+            // Try to load empathy data from sessionStorage first
+            const stored = sessionStorage.getItem("mindful-empathy-data")
+            if (stored) {
+              try {
+                const parsed = JSON.parse(stored) as EmpathyResponse
+                setEmpathyData(parsed)
+                console.log("[mindful-ai] Loaded empathy data from sessionStorage")
+              } catch (error) {
+                console.error("[mindful-ai] Failed to parse stored empathy data:", error)
+                sessionStorage.removeItem("mindful-empathy-data")
+              }
+            }
+          } else {
+            console.log("[mindful-ai] User hasn't completed onboarding, showing questionnaire")
+            setIsOnboardingCompleted(false)
+          }
+        }
       } catch (error) {
-        console.error("[mindful-ai] Failed to parse stored empathy data:", error)
-        sessionStorage.removeItem("mindful-empathy-data")
-        sessionStorage.removeItem("mindful-onboarding-completed")
+        console.error("[mindful-ai] Failed to check onboarding status:", error)
+      } finally {
+        setIsCheckingOnboarding(false)
       }
     }
-  }, [])
+
+    if (status === "authenticated") {
+      checkOnboardingStatus()
+    } else if (status === "unauthenticated") {
+      setIsCheckingOnboarding(false)
+    }
+  }, [status])
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -372,6 +401,14 @@ export default function OnboardingPage() {
       loadSnapshot()
     }
   }, [status, loadSnapshot])
+
+  // Refresh snapshot when user switches to dashboard or insights tab
+  useEffect(() => {
+    if (status === "authenticated" && (activeTab === "dashboard" || activeTab === "insights")) {
+      console.log("[mindful-ai] Refreshing snapshot for tab:", activeTab)
+      loadSnapshot()
+    }
+  }, [activeTab, status, loadSnapshot])
 
   const markInsightAsRead = useCallback(
     async (insightId: string) => {
@@ -518,7 +555,7 @@ export default function OnboardingPage() {
         // Store empathy data in both state and sessionStorage
         setEmpathyData(empathy)
         sessionStorage.setItem("mindful-empathy-data", JSON.stringify(empathy))
-        sessionStorage.setItem("mindful-onboarding-completed", "true")
+        setIsOnboardingCompleted(true)
         setActiveTab("empathy")
         console.log("[mindful-ai] ✅ Empathy data set successfully and saved to sessionStorage!")
 
@@ -617,13 +654,16 @@ export default function OnboardingPage() {
   )
   const alerts = useMemo(() => snapshot.aiInsights.filter((i) => i.type === "alert"), [snapshot.aiInsights])
 
-  if (status === "loading" || status === "unauthenticated") {
+  if (status === "loading" || status === "unauthenticated" || isCheckingOnboarding) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-sm text-text-muted">Preparing your onboarding experience…</div>
+        <div className="text-sm text-text-muted">Preparing your dashboard…</div>
       </div>
     )
   }
+
+  // Show results view if user has completed onboarding OR just completed it
+  const showResults = isOnboardingCompleted || isCompleted
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -639,7 +679,7 @@ export default function OnboardingPage() {
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-        {!isCompleted && <ProgressSidebar currentStep={currentStepIndex + 1} steps={steps} />}
+        {!showResults && <ProgressSidebar currentStep={currentStepIndex + 1} steps={steps} />}
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="hidden border-b border-border p-4 md:flex">
@@ -651,7 +691,7 @@ export default function OnboardingPage() {
             </Button>
           </div>
 
-          {isCompleted ? (
+          {showResults ? (
             <OnboardingResults
               activeTab={activeTab}
               onTabChange={setActiveTab}
