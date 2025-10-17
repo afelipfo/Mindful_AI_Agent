@@ -22,7 +22,7 @@ export default function SignInPage() {
     setIsLoading(true)
 
     try {
-      console.log("Attempting to sign in with:", { email, password: "***" })
+      console.log("🔐 Attempting to sign in with:", { email, password: "***" })
 
       const result = await signIn("credentials", {
         email,
@@ -30,22 +30,38 @@ export default function SignInPage() {
         redirect: false,
       })
 
-      console.log("Sign in result:", result)
+      console.log("📋 Sign in result:", result)
+      console.log("📋 Result.ok:", result?.ok)
+      console.log("📋 Result.error:", result?.error)
+      console.log("📋 Result.url:", result?.url)
 
       if (result?.error) {
-        console.error("Sign in error:", result.error)
-        setError(`Authentication failed: ${result.error}`)
+        console.error("❌ Sign in error:", result.error)
+
+        // More specific error messages
+        if (result.error.includes("Email not confirmed")) {
+          setError("Please confirm your email address before signing in. Check your inbox for the confirmation link.")
+        } else if (result.error.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please check your credentials and try again.")
+        } else if (result.error.includes("Email rate limit exceeded")) {
+          setError("Too many login attempts. Please wait a few minutes before trying again.")
+        } else {
+          setError(`Authentication failed: ${result.error}`)
+        }
       } else if (result?.ok) {
-        console.log("Sign in successful, redirecting...")
-        router.push("/onboarding")
-        router.refresh()
+        console.log("✅ Sign in successful, redirecting...")
+        // Add a small delay to ensure session is set
+        setTimeout(() => {
+          router.push("/onboarding")
+          router.refresh()
+        }, 100)
       } else {
-        console.log("Unexpected result:", result)
+        console.log("⚠️ Unexpected result:", result)
         setError("Authentication failed. Please try again.")
       }
     } catch (error) {
-      console.error("Sign in exception:", error)
-      setError("An error occurred. Please try again.")
+      console.error("💥 Sign in exception:", error)
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
