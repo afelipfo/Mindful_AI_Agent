@@ -4,6 +4,7 @@ import dynamicImport from "next/dynamic"
 import { format } from "date-fns"
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, BarChart3, Sparkles, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -141,7 +142,7 @@ export function OnboardingResults({
       </div>
 
       <TabsContent value="empathy" className="m-0 p-0">
-        {empathyData && (
+        {empathyData ? (
           <div className="space-y-4">
             {empathyData.warnings && empathyData.warnings.length > 0 && (
               <div className="bg-warning/10 border border-warning/20 text-warning rounded-md mx-auto mt-6 max-w-3xl px-4 py-3">
@@ -166,6 +167,19 @@ export function OnboardingResults({
                 Continue to Dashboard
               </Button>
             </div>
+          </div>
+        ) : (
+          <div className="container mx-auto px-4 py-16 md:px-6">
+            <Card className="p-12 text-center max-w-2xl mx-auto">
+              <Heart className="mx-auto mb-6 h-16 w-16 text-text-muted" />
+              <h2 className="text-2xl font-semibold mb-3">No Recommendations Yet</h2>
+              <p className="text-text-secondary mb-6">
+                Complete the onboarding conversation to receive personalized wellness recommendations based on your mood and needs.
+              </p>
+              <Button onClick={() => onTabChange("dashboard")} variant="outline">
+                View Dashboard
+              </Button>
+            </Card>
           </div>
         )}
       </TabsContent>
@@ -275,8 +289,8 @@ export function OnboardingResults({
                   If you're experiencing persistent difficulties, consider reaching out to a mental health professional.
                 </p>
               </div>
-              <Button variant="outline" className="flex-shrink-0 bg-transparent">
-                Find Resources
+              <Button asChild variant="outline" className="flex-shrink-0 bg-transparent">
+                <Link href="/professionals">Find Resources</Link>
               </Button>
             </div>
           </Card>
@@ -319,9 +333,16 @@ export function OnboardingResults({
             </TabsList>
 
             <TabsContent value="all" className="space-y-4">
-              {aiInsights.map((insight, index) => (
-                <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
-              ))}
+              {aiInsights.length > 0 ? (
+                aiInsights.map((insight, index) => (
+                  <InsightCard key={insight.id ?? index} insight={insight} onDismiss={onDismissInsight} />
+                ))
+              ) : (
+                <Card className="p-8 text-center">
+                  <Sparkles className="mx-auto mb-4 h-12 w-12 text-text-muted" />
+                  <p className="text-text-secondary">No AI insights yet. Keep logging check-ins and we'll start generating personalized insights!</p>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="patterns" className="space-y-4">

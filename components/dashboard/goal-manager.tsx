@@ -75,6 +75,7 @@ export function GoalManager({ goals, onRefresh }: GoalManagerProps) {
         }
 
         resetForm()
+        setIsOpen(false)
         await onRefresh()
         toast({
           title: "Goal added",
