@@ -24,48 +24,20 @@ function SignInForm() {
     setError("")
     setIsLoading(true)
 
-    try {
-      console.log("🔐 Attempting to sign in with:", { email, password: "***", callbackUrl })
+    console.log("🔐 Starting sign in with callbackUrl:", callbackUrl)
 
-      // Use redirect: true to let NextAuth handle the redirect
-      const result = await signIn("credentials", {
-        email,
-        password,
-        callbackUrl,
-        redirect: false, // We'll handle redirect manually for better error handling
-      })
+    // Let NextAuth handle EVERYTHING - including the redirect
+    await signIn("credentials", {
+      email,
+      password,
+      callbackUrl,
+    })
 
-      console.log("📋 Sign in result:", result)
-
-      if (result?.error) {
-        console.error("❌ Sign in error:", result.error)
-        setIsLoading(false)
-
-        // More specific error messages
-        if (result.error.includes("Email not confirmed")) {
-          setError("Please confirm your email address before signing in. Check your inbox for the confirmation link.")
-        } else if (result.error.includes("Invalid login credentials")) {
-          setError("Invalid email or password. Please check your credentials and try again.")
-        } else if (result.error.includes("Email rate limit exceeded")) {
-          setError("Too many login attempts. Please wait a few minutes before trying again.")
-        } else {
-          setError(`Authentication failed: ${result.error}`)
-        }
-      } else if (result?.ok) {
-        console.log("✅ Sign in successful! Redirecting to:", callbackUrl)
-
-        // Force a full page reload to the callback URL
-        window.location.href = callbackUrl
-      } else {
-        console.log("⚠️ Unexpected result:", result)
-        setIsLoading(false)
-        setError("Authentication failed. Please try again.")
-      }
-    } catch (error) {
-      console.error("💥 Sign in exception:", error)
-      setIsLoading(false)
-      setError("An unexpected error occurred. Please try again.")
-    }
+    // If we reach here, it means signIn failed (since redirect: true by default)
+    // NextAuth will redirect on success, so this only runs on failure
+    console.log("❌ Sign in failed - no redirect occurred")
+    setIsLoading(false)
+    setError("Authentication failed. Please check your credentials and try again.")
   }
 
   return (
