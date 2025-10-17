@@ -37,3 +37,6 @@ yarn-error.log*
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Scripts (avoid Next.js compilation issues)
+scripts/
