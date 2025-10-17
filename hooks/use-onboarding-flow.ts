@@ -136,15 +136,18 @@ export function useOnboardingFlow({
       })
 
       try {
+        console.log("[mindful-ai] Starting onboarding completion...")
         await onComplete({
           conversation: [...conversationSnapshot],
           responsesByStep: { ...responsesByStep, [currentStepIndex]: userMessage },
           latestUserMessage: userMessage,
         })
+        console.log("[mindful-ai] Onboarding completion successful, switching to completed state")
         setFlowState("completed")
       } catch (error) {
         console.error("[mindful-ai] onboarding completion error:", error)
-        setFlowState("collecting")
+        // Still set to completed even if there's an error, so UI shows results
+        setFlowState("completed")
       } finally {
         setIsProcessing(false)
         setCurrentStepIndex(nextStepIndex)

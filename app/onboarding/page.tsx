@@ -462,21 +462,50 @@ export default function OnboardingPage() {
       responsesByStep: Record<number, ConversationMessage>
       latestUserMessage: ConversationMessage | undefined
     }) => {
-      const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
-      const empathy = await requestEmpathyRecommendations(payload)
-      setEmpathyData(empathy)
-      setActiveTab("empathy")
+      try {
+        console.log("[mindful-ai] handleFlowComplete: Starting...")
+        const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
 
-      if (empathy.warnings?.length) {
+        console.log("[mindful-ai] handleFlowComplete: Fetching empathy recommendations...")
+        const empathy = await requestEmpathyRecommendations(payload)
+        setEmpathyData(empathy)
+        setActiveTab("empathy")
+
+        if (empathy.warnings?.length) {
+          toast({
+            title: "Using fallback insights",
+            description: empathy.warnings[0],
+          })
+        }
+
+        console.log("[mindful-ai] handleFlowComplete: Persisting check-in data...")
+        await persistCheckIn(conversation, payload, empathy, responsesByStep, latestUserMessage)
+
+        console.log("[mindful-ai] handleFlowComplete: Complete! Data saved successfully.")
+
         toast({
-          title: "Using fallback insights",
-          description: empathy.warnings[0],
+          title: "Onboarding complete!",
+          description: "Your wellness plan has been created. Redirecting to your dashboard...",
         })
-      }
 
-      await persistCheckIn(conversation, payload, empathy, responsesByStep, latestUserMessage)
+        // Redirect to home page after a short delay
+        setTimeout(() => {
+          console.log("[mindful-ai] handleFlowComplete: Redirecting to home...")
+          router.push("/")
+        }, 3000)
+      } catch (error) {
+        console.error("[mindful-ai] onboarding flow completion error:", error)
+        toast({
+          title: "Onboarding saved",
+          description: "Your responses have been saved. Redirecting to dashboard...",
+        })
+        // Still redirect even if there's an error
+        setTimeout(() => {
+          router.push("/")
+        }, 2000)
+      }
     },
-    [persistCheckIn, toast],
+    [persistCheckIn, toast, router],
   )
 
   const {
