@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Heart,
   Lightbulb,
@@ -10,9 +11,8 @@ import {
   ChevronRight,
   ThumbsUp,
   ThumbsDown,
-  Share2,
   RotateCcw,
-  Target,
+  MoreHorizontal,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -48,47 +48,50 @@ const moodBadgeClasses: Record<string, string> = {
 
 export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: EmpathyRecommendationsProps) {
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null)
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false)
+  const [showMoreResources, setShowMoreResources] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
-  const sources = recommendation.analysisSources ?? []
   const moodKey = recommendation.detectedMood?.toLowerCase()
   const moodLabel = moodLabels[moodKey] ?? recommendation.detectedMood
   const moodBadge = moodBadgeClasses[moodKey] ?? "bg-primary/10 text-primary border-primary/30"
 
-  const handleFeedback = (value: "helpful" | "not_helpful") => {
+  const handleFeedback = async (value: "helpful" | "not_helpful") => {
     setFeedback(value)
-    console.log("[mindful-ai] user feedback:", value)
-  }
-
-  const handleAction = (actionType: string) => {
-    console.log("[mindful-ai] recommendation action:", actionType)
-  }
-
-  const handleShare = async () => {
-    const shareText = `Mood: ${moodLabel}\nSummary: ${recommendation.analysisSummary}\nEmpathy: ${recommendation.empathyMessage}`
+    setIsSavingFeedback(true)
 
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "Mindful AI Insight",
-          text: shareText,
-        })
-      } else if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(shareText)
+      // Save feedback to database
+      const response = await fetch("/api/empathy-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mood: recommendation.detectedMood,
+          feedback: value,
+          confidence: recommendation.confidence,
+          timestamp: new Date().toISOString(),
+        }),
+      })
+
+      if (response.ok) {
         toast({
-          title: "Copied to clipboard",
-          description: "Insight summary copied. Share it with someone you trust.",
+          title: value === "helpful" ? "Thank you!" : "Feedback received",
+          description: value === "helpful"
+            ? "Your feedback helps us improve recommendations."
+            : "We'll use this to provide better suggestions.",
         })
-      } else {
-        throw new Error("Sharing not supported")
       }
     } catch (error) {
-      console.error("Share failed:", error)
-      toast({
-        title: "Unable to share",
-        description: "We couldn't share this insight automatically. Try copying it manually.",
-      })
+      console.error("[mindful-ai] Failed to save feedback:", error)
+    } finally {
+      setIsSavingFeedback(false)
     }
+  }
+
+  const handleJournaling = () => {
+    // Navigate to a journaling page or modal
+    router.push("/journal")
   }
 
   return (
@@ -114,42 +117,18 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
                 </span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-2" onClick={handleShare}>
-                <Share2 className="h-4 w-4" />
-                Share insight
-              </Button>
-              {onReset && (
+            {onReset && (
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="ghost" size="sm" className="gap-2" onClick={onReset}>
                   <RotateCcw className="h-4 w-4" />
                   Reset
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 space-y-4">
             <p className="text-sm leading-relaxed text-text-secondary">{recommendation.analysisSummary}</p>
-
-            {sources.length > 0 && (
-              <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-muted">
-                  <Target className="h-4 w-4" />
-                  Analysis sources
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sources.map((source) => (
-                    <span
-                      key={`${source.type}-${source.label}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-text-muted"
-                    >
-                      <span className="font-semibold text-text-primary">{source.weight}%</span>
-                      {source.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -171,7 +150,7 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
                 <h3 className="mb-2 text-lg font-semibold text-success">{recommendation.recommendation.title}</h3>
                 <p className="mb-3 text-sm text-text-secondary">{recommendation.recommendation.description}</p>
                 <Button
-                  onClick={() => handleAction(recommendation.recommendation.actionType)}
+                  onClick={handleJournaling}
                   variant="outline"
                   size="sm"
                   className="h-10 rounded-lg bg-success/10 text-success transition-colors hover:bg-success/20 focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 active:scale-95"
@@ -261,6 +240,69 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
               <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
             </a>
           </div>
+
+          {/* See More Resources Button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={() => setShowMoreResources(!showMoreResources)}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+              {showMoreResources ? "Show Less" : "See More Resources"}
+            </Button>
+          </div>
+
+          {/* Additional Resources (shown when expanded) */}
+          {showMoreResources && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-down">
+              <a
+                href={`https://open.spotify.com/search/${encodeURIComponent(moodLabel + " mood music")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative rounded-lg border border-border bg-background p-4 transition hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+                  <Music className="h-5 w-5 text-white" />
+                </div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">More Music</p>
+                <h4 className="mb-1.5 text-sm font-semibold text-text-primary">Explore {moodLabel} Playlists</h4>
+                <p className="text-xs text-text-secondary">Discover more music tailored to your mood</p>
+                <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              </a>
+
+              <a
+                href={`https://www.amazon.com/s?k=${encodeURIComponent(moodLabel + " self-help books")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative rounded-lg border border-border bg-background p-4 transition hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                  <BookOpen className="h-5 w-5 text-white" />
+                </div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">More Books</p>
+                <h4 className="mb-1.5 text-sm font-semibold text-text-primary">Browse {moodLabel} Books</h4>
+                <p className="text-xs text-text-secondary">Find more reading recommendations</p>
+                <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              </a>
+
+              <a
+                href={`https://www.google.com/maps/search/${encodeURIComponent(recommendation.place.type + " near me")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative rounded-lg border border-border bg-background p-4 transition hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
+                  <MapPin className="h-5 w-5 text-white" />
+                </div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">More Places</p>
+                <h4 className="mb-1.5 text-sm font-semibold text-text-primary">Find Similar Places</h4>
+                <p className="text-xs text-text-secondary">Discover more locations nearby</p>
+                <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              </a>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -269,8 +311,9 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
             <div className="flex gap-2">
               <button
                 onClick={() => handleFeedback("helpful")}
+                disabled={isSavingFeedback}
                 className={cn(
-                  "rounded-lg p-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95",
+                  "rounded-lg p-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                   feedback === "helpful" ? "bg-success/20 text-success" : "bg-muted text-text-secondary hover:bg-muted/80",
                 )}
                 aria-label="Mark as helpful"
@@ -279,8 +322,9 @@ export function EmpathyRecommendations({ recommendation, onDismiss, onReset }: E
               </button>
               <button
                 onClick={() => handleFeedback("not_helpful")}
+                disabled={isSavingFeedback}
                 className={cn(
-                  "rounded-lg p-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95",
+                  "rounded-lg p-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                   feedback === "not_helpful" ? "bg-danger/20 text-danger" : "bg-muted text-text-secondary hover:bg-muted/80",
                 )}
                 aria-label="Mark as not helpful"

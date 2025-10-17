@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, memo, useTransition } from "react"
+import { memo, useTransition } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
+import { Brain, Lightbulb, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { AIInsight } from "@/types/wellness"
 
@@ -14,7 +14,6 @@ interface InsightCardProps {
 }
 
 export const InsightCard = memo(function InsightCard({ insight, onDismiss, onViewRecommendations }: InsightCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const getIcon = () => {
@@ -57,23 +56,9 @@ export const InsightCard = memo(function InsightCard({ insight, onDismiss, onVie
           <div className={cn("flex-shrink-0 mt-1", getIconColor())}>{getIcon()}</div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-semibold mb-2">{insight.title}</h3>
-            <div
-              className={cn(
-                "text-sm text-text-secondary leading-relaxed transition-all duration-300",
-                !isExpanded && "line-clamp-2",
-              )}
-            >
+            <div className="text-sm text-text-secondary leading-relaxed">
               {insight.description}
             </div>
-            {insight.description.length > 100 && (
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="mt-2 text-sm text-primary hover:underline flex items-center gap-1"
-              >
-                {isExpanded ? "Show less" : "Read more"}
-                <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
-              </button>
-            )}
             <div className="mt-4 flex gap-2">
               {onViewRecommendations && (
                 <Button

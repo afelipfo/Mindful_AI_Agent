@@ -1,79 +1,287 @@
 # Mindful AI Agent
 
 ## Overview
-Mindful AI Agent is a Next.js 15 application that guides users through multimodal mental-health check-ins, persists their onboarding history in Supabase, and surfaces personalised analytics, recommendations, and goals. The project is production-ready for Vercel deployments and aligns with Supabase's row-level security policies.
+Mindful AI Agent is a Next.js 15 application designed to support mental wellness through multimodal check-ins, personalized recommendations, and comprehensive analytics. The application guides users through conversational onboarding, captures mood and energy data across multiple input modalities (text, voice, emoji, images), and provides AI-driven insights to support mental health awareness. All user data is persisted in Supabase with row-level security policies ensuring privacy and data isolation.
 
-## Core Capabilities
-- Conversational onboarding with text, voice, emoji, and image inputs (`app/onboarding/page.tsx`).
-- Transactional persistence of onboarding responses, mood entries, and insights through the `process_onboarding_check_in` RPC (`app/api/onboarding/check-in/route.ts`).
-- Personalised wellness dashboard with trend visualisations, energy heatmaps, trigger clouds, and wellbeing score cards.
-- Goal management dialog for creating, updating, archiving, and deleting Supabase-backed wellness goals (`components/dashboard/goal-manager.tsx`).
-- Mood-entry history inspector with inline editing and deletion controls (`components/dashboard/mood-entry-history.tsx`).
-- AI insights centre with dismiss (mark-as-read) workflow and badge summaries.
+## Core Features
 
-## Architecture Highlights
-- **Frontend**: Next.js App Router, React 19, Tailwind CSS v4, shadcn/ui, Recharts.
-- **Backend**: Supabase (PostgreSQL + Auth) accessed via Next.js API routes; service-role operations are isolated to server contexts.
-- **Authentication**: NextAuth credentials provider backed by Supabase Auth (`lib/auth.ts`).
-- **Data Layer**: Supabase RPCs and views deliver aggregated trigger, coping, and energy metrics (`supabase/schema.sql`).
-- **Analytics Utilities**: Shared helpers in `lib/analytics.ts` normalise data for UI consumption and are covered by automated tests.
+### Onboarding and Check-ins
+- Conversational onboarding wizard with 6-step questionnaire covering daily routines, current mood/energy, triggers, coping strategies, wellness goals, and support preferences.
+- Multimodal input support: text responses, voice recordings with transcription, emoji selection, and image upload with AI analysis.
+- Empathy-driven recommendations generated via OpenAI based on detected mood, emotions, and user context.
+- Personalized content recommendations including Spotify music playlists, book suggestions, inspirational quotes, and nearby wellness locations.
+
+### Dashboard and Analytics
+- Comprehensive wellness dashboard displaying 7-day and 30-day trend visualizations for mood and energy levels.
+- Wellbeing score calculated from recent mood and energy check-ins.
+- Energy heatmap showing energy patterns by time of day and day of week.
+- Trigger cloud visualization highlighting frequent mood triggers.
+- Check-in streak tracking to encourage consistent engagement.
+- Recent check-in history with inline editing and deletion capabilities.
+
+### Goal Management
+- Create, update, and track wellness goals with progress visualization.
+- Goal archiving and deletion with confirmation dialogs.
+- Real-time progress calculations based on current and target values.
+
+### AI Insights
+- AI-generated insights categorized as patterns, recommendations, or alerts.
+- Insight center with filtering by type and read/unread status.
+- Dismissal workflow to mark insights as reviewed.
+
+### Journaling
+- Dedicated journaling page for reflective writing at `/journal`.
+- Save journal entries with automatic timestamp and date tracking.
+- View recent journal entries (last 20) with date and time information.
+- Private entries stored securely with RLS policies.
+
+### Feedback System
+- User feedback mechanism (helpful/not helpful) on empathy recommendations.
+- Feedback data stored for continuous improvement of recommendation accuracy.
+- Analytics endpoint to track feedback statistics by mood and overall helpfulness.
+
+### Professional Support
+- Directory of mental health professionals with specialty, location, and availability information.
+- Contact and messaging functionality to connect with professionals.
+- Profile pages with detailed bio, experience, and language capabilities.
+
+## Architecture
+
+### Technology Stack
+- **Frontend**: Next.js 15 App Router, React 19, TypeScript, Tailwind CSS v4
+- **UI Components**: shadcn/ui component library with Radix UI primitives
+- **Data Visualization**: Recharts for trend charts and heatmaps
+- **Backend**: Next.js API routes with server-side rendering
+- **Database**: Supabase (PostgreSQL) with row-level security policies
+- **Authentication**: NextAuth.js with credentials provider backed by Supabase Auth
+- **AI Services**: OpenAI for empathy generation, mood analysis, and content recommendations
+- **External APIs**: Spotify (music), Foursquare (places), Amazon (books)
+
+### Data Layer
+- Supabase database with comprehensive schema including profiles, mood entries, wellness goals, AI insights, journal entries, and feedback tracking.
+- Row-level security (RLS) policies ensuring users can only access their own data.
+- Database functions and triggers for automated profile creation, timestamp updates, and transactional data processing.
+- Aggregated analytics views for trigger frequency, coping effectiveness, and energy patterns.
+- Stored procedure `process_onboarding_check_in` for atomic persistence of onboarding responses and mood entries.
+
+### Key Directories
+```
+app/
+├── api/                      # Next.js API routes
+│   ├── analyze/             # Text, voice, and image analysis endpoints
+│   ├── empathy-feedback/    # Feedback collection and statistics
+│   ├── empathy-recommendations/  # AI-driven recommendation generation
+│   ├── journal/             # Journal entry CRUD operations
+│   ├── mood-entries/        # Mood entry management
+│   ├── onboarding/          # Onboarding check-in persistence
+│   ├── professionals/       # Professional directory and messaging
+│   ├── wellness-goals/      # Goal CRUD operations
+│   ├── wellness-snapshot/   # Consolidated dashboard data feed
+│   └── *-recommendation/    # Music, book, quote, place recommendations
+├── auth/                    # Authentication pages (signin, signup, error)
+├── journal/                 # Journaling interface
+├── onboarding/              # Onboarding wizard and results dashboard
+├── professionals/           # Professional directory
+├── profile/                 # User profile management
+└── settings/                # User preferences and settings
+
+components/
+├── check-in/                # Empathy recommendations and feedback UI
+├── dashboard/               # Dashboard visualizations and management dialogs
+├── insights/                # AI insight display components
+├── layout/                  # Header, footer, and layout components
+├── onboarding/              # Onboarding conversation interface
+└── ui/                      # shadcn/ui base components
+
+lib/
+├── analytics.ts             # Data transformation utilities
+├── auth.ts                  # NextAuth configuration
+├── empathy-agent.ts         # Empathy response generation logic
+├── mcp-tools.ts             # MCP tool integrations
+├── supabase/                # Supabase client utilities
+└── utils.ts                 # General utility functions
+
+supabase/
+└── schema.sql               # Complete database schema with tables, indexes, RLS policies, functions, triggers, and views
+```
 
 ## Environment Configuration
-| Variable | Scope | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | client/server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client/server | Public anon key for client reads |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only | Service role key for transactional writes (never expose to the browser) |
-| `NEXTAUTH_SECRET` | server | Session signing secret |
-| `NEXTAUTH_URL` | server | Base URL for NextAuth callbacks |
-| `OPENAI_API_KEY` | server | Empathy and content generation |
-| `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | server | Music recommendations |
-| `FOURSQUARE_API_KEY` | server (optional) | Place recommendations |
+
+### Required Variables
+```bash
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your-project-url.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# NextAuth Configuration
+NEXTAUTH_SECRET=your-secret-key
+NEXTAUTH_URL=http://localhost:3000
+
+# AI and Content Services
+OPENAI_API_KEY=your-openai-api-key
+SPOTIFY_CLIENT_ID=your-spotify-client-id
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+
+# Optional Services
+FOURSQUARE_API_KEY=your-foursquare-api-key
+```
+
+### Security Notes
+- `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to the client; it is used only in server-side contexts (API routes).
+- `NEXT_PUBLIC_*` variables are safe for client-side use and follow Next.js conventions.
+- All authentication operations use the public anon key with RLS policies enforcing access control.
 
 ## Local Development
-```bash
-pnpm install
-pnpm dev
-```
-1. Provision a Supabase project and apply `supabase/schema.sql` via the SQL Editor or CLI.
-2. Populate `.env.local` with the variables above.
-3. Launch `pnpm dev` and complete the onboarding flow at `http://localhost:3000/onboarding`.
 
-## Quality Gates
+### Setup
 ```bash
-pnpm lint        # Next.js + ESLint checks
-pnpm test        # Node test runner covering analytics helpers
-pnpm build       # Production build used in CI/CD and Vercel
+# Install dependencies
+npm install
+
+# Copy environment template
+cp .env.example .env.local
+
+# Edit .env.local with your credentials
 ```
 
-## Key Modules & Directories
-- `app/onboarding/page.tsx` – conversational wizard, dashboard, insights, and empathy tabs.
-- `app/api/wellness-snapshot/route.ts` – consolidated data feed for dashboards.
-- `app/api/mood-entries/[id]/route.ts` – edit/delete API for historic check-ins.
-- `app/api/wellness-goals(/[id])/route.ts` – CRUD endpoints powering goal management.
-- `app/api/ai-insights/[id]/route.ts` – mark-as-read endpoint for insights.
-- `components/dashboard/*` – reusable dashboard visualisations and management dialogs.
-- `lib/analytics.ts` – deterministic data transforms reused by both API layer and client components.
-- `supabase/schema.sql` – canonical database schema, RLS policies, RPC, and reporting views.
-- `tests/analytics.test.ts` – Node-based smoke tests validating analytics helpers.
+### Database Setup
+1. Create a new Supabase project at https://supabase.com
+2. Navigate to SQL Editor in Supabase dashboard
+3. Execute `supabase/schema.sql` to create all tables, policies, functions, and views
+4. Verify that RLS is enabled on all tables
 
-## HTTP Surface
-| Method | Path | Description |
-| --- | --- | --- |
-| `POST` | `/api/onboarding/check-in` | Persists onboarding responses and mood entry via RPC transaction. |
-| `GET` | `/api/wellness-snapshot` | Returns per-user mood entries, goals, triggers, coping insights, and energy buckets. |
-| `PATCH` `DELETE` | `/api/mood-entries/:id` | Update or remove a mood entry. |
-| `GET` `POST` | `/api/wellness-goals` | List or create wellness goals. |
-| `PATCH` `DELETE` | `/api/wellness-goals/:id` | Update progress / archive / remove a goal. |
-| `PATCH` | `/api/ai-insights/:id` | Mark an AI insight as read. |
-| `POST` | `/api/empathy-recommendations` | Generates empathy response and personalised content via OpenAI + partner APIs. |
-| `POST` | `/api/{music,book,quote,place}-recommendation` | Fetches supplemental content from external providers. |
+### Run Development Server
+```bash
+npm run dev
+```
+Access the application at http://localhost:3000
 
-## Deployment Notes
-- The project is optimised for Vercel. Ensure all environment variables are defined in the Vercel dashboard, and restrict `SUPABASE_SERVICE_ROLE_KEY` to server-only contexts (functions, edge middleware).
-- Apply `supabase/schema.sql` to production Supabase before first deploy to guarantee required tables, policies, RPCs, and views exist.
-- Vercel builds run `pnpm build`; keep the tree clean by committing generated API route files (`app/api/**/route.ts`) and sources referenced above.
-- Observability is available through Vercel Analytics (`Analytics` component in `app/layout.tsx`). Consider layering Sentry or Logflare if deeper instrumentation is required.
+### Complete Initial Onboarding
+1. Navigate to http://localhost:3000/auth/signup to create an account
+2. Complete the onboarding flow at http://localhost:3000/onboarding
+3. View your personalized dashboard, AI insights, and recommendations
+
+## Quality Assurance
+
+### Linting
+```bash
+npm run lint
+```
+Runs ESLint with Next.js configuration to catch code quality issues.
+
+### Testing
+```bash
+npm run test
+```
+Executes Node.js test runner covering analytics utility functions in `tests/analytics.test.ts`.
+
+### Build Verification
+```bash
+npm run build
+```
+Produces optimized production build. Verifies TypeScript compilation, component rendering, and API route bundling.
+
+## API Reference
+
+### Authentication
+- `POST /api/auth/signup` - Create new user account
+- `POST /api/auth/[...nextauth]` - NextAuth authentication endpoints
+- `POST /api/auth/resend-confirmation` - Resend email confirmation
+
+### Onboarding and Mood Tracking
+- `POST /api/onboarding/check-in` - Persist onboarding responses and mood entry via database RPC
+- `GET /api/wellness-snapshot` - Retrieve comprehensive user wellness data including mood entries, goals, triggers, coping strategies, and energy patterns
+- `PATCH /api/mood-entries/:id` - Update existing mood entry
+- `DELETE /api/mood-entries/:id` - Remove mood entry
+
+### Analysis Endpoints
+- `POST /api/analyze/text` - Analyze text input for mood and emotions
+- `POST /api/analyze/voice` - Transcribe and analyze voice recording
+- `POST /api/analyze/image` - Analyze image for mood indicators
+
+### Wellness Goals
+- `GET /api/wellness-goals` - List user's wellness goals
+- `POST /api/wellness-goals` - Create new wellness goal
+- `PATCH /api/wellness-goals/:id` - Update goal progress or details
+- `DELETE /api/wellness-goals/:id` - Remove wellness goal
+
+### AI Insights
+- `PATCH /api/ai-insights/:id` - Mark insight as read/reviewed
+
+### Empathy and Recommendations
+- `POST /api/empathy-recommendations` - Generate AI-driven empathy response with personalized recommendations
+- `POST /api/empathy-feedback` - Submit feedback on recommendation helpfulness
+- `GET /api/empathy-feedback` - Retrieve feedback statistics for analytics
+- `POST /api/music-recommendation` - Get Spotify playlist for detected mood
+- `POST /api/book-recommendation` - Get book suggestion from Amazon
+- `POST /api/quote-recommendation` - Get inspirational quote via OpenAI
+- `POST /api/place-recommendation` - Get nearby wellness location via Foursquare
+
+### Journaling
+- `GET /api/journal` - Retrieve recent journal entries (last 20)
+- `POST /api/journal` - Save new journal entry
+
+### Professionals
+- `GET /api/professionals` - List available mental health professionals
+- `POST /api/professionals/contact-message` - Send initial contact message
+- `GET /api/professionals/:id/messages` - Retrieve conversation history
+- `POST /api/professionals/:id/messages` - Send message to professional
+
+### User Management
+- `GET /api/profile` - Retrieve user profile
+- `PATCH /api/profile` - Update profile information
+- `GET /api/settings` - Get user preferences
+- `PATCH /api/settings` - Update user preferences
+
+## Deployment
+
+### Vercel Deployment
+This application is optimized for Vercel deployment:
+
+1. **Connect Repository**: Import project from GitHub in Vercel dashboard
+2. **Configure Environment Variables**: Add all required environment variables in Vercel project settings
+3. **Database Migration**: Execute `supabase/schema.sql` in production Supabase instance before first deployment
+4. **Deploy**: Vercel automatically runs `npm run build` and deploys
+
+### Environment Variable Security
+- Ensure `SUPABASE_SERVICE_ROLE_KEY` is not exposed to client bundles
+- All server-only variables should be accessed only in API routes or server components
+- Use Vercel's environment variable encryption for sensitive credentials
+
+### Database Considerations
+- Apply schema changes via Supabase SQL Editor or CLI migrations
+- Ensure RLS policies are enabled on all tables before production use
+- Test RLS policies with different user roles to verify access control
+- Consider creating database backups before schema modifications
+
+### Monitoring and Observability
+- Vercel Analytics is integrated via `Analytics` component in app layout
+- Consider adding Sentry for error tracking in production
+- Monitor Supabase dashboard for database performance and query patterns
+- Review API route logs in Vercel dashboard for debugging
+
+## Extending the Application
+
+### Adding New Features
+1. Create new API routes in `app/api/` for backend logic
+2. Add corresponding UI components in `components/`
+3. Update database schema in `supabase/schema.sql` if new tables are needed
+4. Add RLS policies for any new tables to ensure data security
+5. Update this README with new API endpoints and features
+
+### Custom Analytics
+- Extend `lib/analytics.ts` with new data transformation functions
+- Add tests in `tests/analytics.test.ts` to verify calculations
+- Update dashboard components to visualize new metrics
+
+### AI Model Improvements
+- Modify `lib/empathy-agent.ts` to adjust empathy generation prompts
+- Update feedback collection in `app/api/empathy-feedback/route.ts`
+- Use collected feedback data to fine-tune recommendation accuracy
+
+## License
+This project is private and proprietary. All rights reserved.
 
 ## Support
-For schema or deployment adjustments, edit `supabase/schema.sql` and re-run migrations. For UI or UX extensions, prioritise colocating view logic within `components/dashboard` and preserve analytics contracts defined in `lib/analytics.ts`.
+For questions, bug reports, or feature requests, please contact the development team or create an issue in the project repository.

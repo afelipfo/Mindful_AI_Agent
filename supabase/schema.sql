@@ -110,6 +110,26 @@ CREATE TABLE IF NOT EXISTS professional_messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
+-- Create empathy_feedback table for recommendation accuracy tracking
+CREATE TABLE IF NOT EXISTS empathy_feedback (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  detected_mood TEXT NOT NULL,
+  feedback TEXT CHECK (feedback IN ('helpful', 'not_helpful')) NOT NULL,
+  confidence NUMERIC,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create journal_entries table for user journaling
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL,
+  date DATE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
 -- Create indexes for better query performance
 CREATE INDEX idx_mood_entries_user_id ON mood_entries(user_id);
 CREATE INDEX idx_mood_entries_date ON mood_entries(date DESC);
@@ -120,6 +140,11 @@ CREATE INDEX idx_ai_insights_user_id ON ai_insights(user_id);
 CREATE INDEX idx_professional_messages_user_id ON professional_messages(user_id);
 CREATE INDEX idx_professional_messages_professional_id ON professional_messages(professional_id);
 CREATE INDEX idx_professional_messages_conversation ON professional_messages(user_id, professional_id, created_at DESC);
+CREATE INDEX idx_empathy_feedback_user_id ON empathy_feedback(user_id);
+CREATE INDEX idx_empathy_feedback_mood ON empathy_feedback(detected_mood);
+CREATE INDEX idx_journal_entries_user_id ON journal_entries(user_id);
+CREATE INDEX idx_journal_entries_date ON journal_entries(date DESC);
+CREATE INDEX idx_journal_entries_user_date ON journal_entries(user_id, date DESC);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -129,6 +154,8 @@ ALTER TABLE wellness_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE professionals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE professional_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE empathy_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
 CREATE POLICY "Users can view own profile"
@@ -217,6 +244,32 @@ CREATE POLICY "Users can insert own messages"
   ON professional_messages FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+-- RLS Policies for empathy_feedback
+CREATE POLICY "Users can view own feedback"
+  ON empathy_feedback FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own feedback"
+  ON empathy_feedback FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies for journal_entries
+CREATE POLICY "Users can view own journal entries"
+  ON journal_entries FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own journal entries"
+  ON journal_entries FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own journal entries"
+  ON journal_entries FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own journal entries"
+  ON journal_entries FOR DELETE
+  USING (auth.uid() = user_id);
+
 -- Function to automatically create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -261,6 +314,9 @@ CREATE TRIGGER update_wellness_goals_updated_at BEFORE UPDATE ON wellness_goals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_professionals_updated_at BEFORE UPDATE ON professionals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_journal_entries_updated_at BEFORE UPDATE ON journal_entries
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Ensure profile preference columns exist when applying incremental schema updates

@@ -143,16 +143,6 @@ export function OnboardingResults({
       <TabsContent value="empathy" className="m-0 p-0">
         {empathyData ? (
           <div className="space-y-4">
-            {empathyData.warnings && empathyData.warnings.length > 0 && (
-              <div className="bg-warning/10 border border-warning/20 text-warning rounded-md mx-auto mt-6 max-w-3xl px-4 py-3">
-                <p className="text-sm font-medium">We fell back to stored insights:</p>
-                <ul className="mt-2 list-disc pl-6 text-xs text-warning/90">
-                  {empathyData.warnings.map((warning, index) => (
-                    <li key={index}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <EmpathyRecommendations
               recommendation={empathyData}
               onDismiss={handleDismissRecommendations}
