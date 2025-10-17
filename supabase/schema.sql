@@ -80,6 +80,36 @@ CREATE TABLE IF NOT EXISTS ai_insights (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
+-- Create professionals table
+CREATE TABLE IF NOT EXISTS professionals (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  name TEXT NOT NULL,
+  specialty TEXT NOT NULL,
+  location TEXT,
+  phone TEXT,
+  email TEXT,
+  photo_url TEXT,
+  bio TEXT,
+  experience TEXT,
+  languages TEXT[] DEFAULT '{}',
+  availability TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create professional_messages table
+CREATE TABLE IF NOT EXISTS professional_messages (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  professional_id UUID REFERENCES professionals ON DELETE CASCADE NOT NULL,
+  sender_id UUID NOT NULL,
+  sender_name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_from_user BOOLEAN NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
 -- Create indexes for better query performance
 CREATE INDEX idx_mood_entries_user_id ON mood_entries(user_id);
 CREATE INDEX idx_mood_entries_date ON mood_entries(date DESC);
@@ -87,6 +117,9 @@ CREATE INDEX idx_mood_entries_user_date ON mood_entries(user_id, date DESC);
 CREATE INDEX idx_onboarding_responses_user_id ON onboarding_responses(user_id);
 CREATE INDEX idx_wellness_goals_user_id ON wellness_goals(user_id);
 CREATE INDEX idx_ai_insights_user_id ON ai_insights(user_id);
+CREATE INDEX idx_professional_messages_user_id ON professional_messages(user_id);
+CREATE INDEX idx_professional_messages_professional_id ON professional_messages(professional_id);
+CREATE INDEX idx_professional_messages_conversation ON professional_messages(user_id, professional_id, created_at DESC);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -94,6 +127,8 @@ ALTER TABLE onboarding_responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mood_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wellness_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE professionals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE professional_messages ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
 CREATE POLICY "Users can view own profile"
@@ -160,9 +195,27 @@ CREATE POLICY "Users can view own ai insights"
   ON ai_insights FOR SELECT
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert own ai insights"
+  ON ai_insights FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
 CREATE POLICY "Users can update own ai insights"
   ON ai_insights FOR UPDATE
   USING (auth.uid() = user_id);
+
+-- RLS Policies for professionals
+CREATE POLICY "All authenticated users can view active professionals"
+  ON professionals FOR SELECT
+  USING (auth.uid() IS NOT NULL AND is_active = true);
+
+-- RLS Policies for professional_messages
+CREATE POLICY "Users can view own messages"
+  ON professional_messages FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own messages"
+  ON professional_messages FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
 -- Function to automatically create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -205,6 +258,9 @@ CREATE TRIGGER update_onboarding_responses_updated_at BEFORE UPDATE ON onboardin
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_wellness_goals_updated_at BEFORE UPDATE ON wellness_goals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_professionals_updated_at BEFORE UPDATE ON professionals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Ensure profile preference columns exist when applying incremental schema updates
@@ -394,3 +450,86 @@ BEGIN
   RETURN inserted_entry_id;
 END;
 $$;
+
+-- Seed data for professionals table
+INSERT INTO professionals (name, specialty, location, phone, email, photo_url, bio, experience, languages, availability, is_active)
+VALUES
+  (
+    'Dr. Sarah Martinez',
+    'Clinical Psychologist',
+    'San Francisco, CA',
+    '+1 (415) 555-0123',
+    'sarah.martinez@mindful.health',
+    'https://i.pravatar.cc/150?img=1',
+    'Specializing in cognitive behavioral therapy and mindfulness-based interventions for anxiety and depression.',
+    '15 years',
+    ARRAY['English', 'Spanish'],
+    'Monday-Friday, 9am-5pm',
+    true
+  ),
+  (
+    'Dr. Michael Chen',
+    'Psychiatrist',
+    'New York, NY',
+    '+1 (212) 555-0456',
+    'michael.chen@mindful.health',
+    'https://i.pravatar.cc/150?img=12',
+    'Board-certified psychiatrist with expertise in medication management and integrative mental health approaches.',
+    '12 years',
+    ARRAY['English', 'Mandarin'],
+    'Tuesday-Saturday, 10am-6pm',
+    true
+  ),
+  (
+    'Dr. Emily Rodriguez',
+    'Licensed Therapist (LMFT)',
+    'Los Angeles, CA',
+    '+1 (310) 555-0789',
+    'emily.rodriguez@mindful.health',
+    'https://i.pravatar.cc/150?img=5',
+    'Marriage and family therapist focused on relationship dynamics, trauma recovery, and emotional regulation.',
+    '10 years',
+    ARRAY['English', 'Spanish'],
+    'Wednesday-Sunday, 11am-7pm',
+    true
+  ),
+  (
+    'Dr. James Wilson',
+    'Clinical Social Worker',
+    'Chicago, IL',
+    '+1 (312) 555-0321',
+    'james.wilson@mindful.health',
+    'https://i.pravatar.cc/150?img=15',
+    'Licensed clinical social worker specializing in stress management, life transitions, and workplace mental health.',
+    '8 years',
+    ARRAY['English'],
+    'Monday-Thursday, 8am-4pm',
+    true
+  ),
+  (
+    'Dr. Priya Patel',
+    'Psychotherapist',
+    'Austin, TX',
+    '+1 (512) 555-0654',
+    'priya.patel@mindful.health',
+    'https://i.pravatar.cc/150?img=9',
+    'Holistic psychotherapist integrating mindfulness, somatic therapy, and narrative approaches for healing.',
+    '11 years',
+    ARRAY['English', 'Hindi', 'Gujarati'],
+    'Monday-Friday, 12pm-8pm',
+    true
+  ),
+  (
+    'Dr. David Thompson',
+    'Addiction Counselor',
+    'Seattle, WA',
+    '+1 (206) 555-0987',
+    'david.thompson@mindful.health',
+    'https://i.pravatar.cc/150?img=13',
+    'Certified addiction counselor with extensive experience in substance abuse recovery and dual diagnosis treatment.',
+    '20 years',
+    ARRAY['English'],
+    'Monday-Saturday, 9am-9pm',
+    true
+  )
+ON CONFLICT DO NOTHING;
