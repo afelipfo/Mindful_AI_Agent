@@ -45,7 +45,7 @@ export function useOnboardingFlow({
     }
     setMessages([initialMessage])
     initializedRef.current = true
-  }, [questions])
+  }, [questions, messages.length])
 
   const steps = useMemo(
     () =>
