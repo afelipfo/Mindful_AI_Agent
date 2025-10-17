@@ -1,14 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, Mic, ImageIcon, Trash2 } from "lucide-react"
+import { Sparkles, Mic, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { EmpathyRecommendations, EmpathyRecommendation } from "@/components/check-in/empathy-recommendations"
 import { VoiceRecorder } from "@/components/check-in/voice-recorder"
-import { PhotoCapture } from "@/components/check-in/photo-capture"
-import { uploadAudio, uploadImage } from "@/lib/upload"
+import { uploadAudio } from "@/lib/upload"
 import { useToast } from "@/components/ui/use-toast"
 
 interface QuickMoodAnalyzerProps {
@@ -33,21 +32,9 @@ interface VoiceAnalysis {
   summary?: string
 }
 
-interface ImageAnalysis {
-  moodLabel?: string
-  confidence?: number
-  emotions?: string[]
-  summary?: string
-}
-
 interface VoiceAttachment {
   url: string
   analysis?: VoiceAnalysis
-}
-
-interface ImageAttachment {
-  url: string
-  analysis?: ImageAnalysis
 }
 
 interface PersistPayload {
@@ -83,11 +70,8 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
 
   const [textAnalysis, setTextAnalysis] = useState<TextAnalysis | null>(null)
   const [voiceAttachment, setVoiceAttachment] = useState<VoiceAttachment | null>(null)
-  const [imageAttachment, setImageAttachment] = useState<ImageAttachment | null>(null)
   const [isVoiceRecorderOpen, setIsVoiceRecorderOpen] = useState(false)
-  const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false)
   const [isUploadingVoice, setIsUploadingVoice] = useState(false)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const { toast } = useToast()
 
@@ -95,7 +79,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
     analysis: EmpathyRecommendation,
     textInsights: TextAnalysis | null,
     voice: VoiceAttachment | null,
-    image: ImageAttachment | null,
     originalInput: string,
   ) => {
     try {
@@ -123,29 +106,12 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         })
       }
 
-      if (image) {
-        responses.push({
-          step: responses.length + 1,
-          stepTitle: "Snapshot",
-          response: image.analysis?.summary || "Photo attached",
-          metadata: {
-            photoUrl: image.url,
-            mood: image.analysis?.moodLabel,
-            confidence: image.analysis?.confidence,
-            emotions: image.analysis?.emotions,
-          },
-        })
-      }
-
       const emotionSet = new Set<string>()
       if (textInsights) {
         textInsights.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
       }
       if (voice?.analysis?.emotions) {
         voice.analysis.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
-      }
-      if (image?.analysis?.emotions) {
-        image.analysis.emotions.forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
       }
       if (analysis.detectedMood) {
         emotionSet.add(analysis.detectedMood.toLowerCase())
@@ -158,9 +124,6 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
       if (voice?.analysis?.transcript) {
         noteSegments.push(`Voice: ${voice.analysis.transcript}`)
       }
-      if (image?.analysis?.summary) {
-        noteSegments.push(`Photo: ${image.analysis.summary}`)
-      }
 
       const fallbackMoodScore = textInsights
         ? Math.min(10, Math.max(1, Math.round(textInsights.confidence / 10)))
@@ -168,11 +131,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
       const moodScore = textInsights?.moodScore ?? voice?.analysis?.moodScore ?? fallbackMoodScore
       const energyLevel = textInsights?.energyLevel ?? voice?.analysis?.energyLevel ?? 5
 
-      const entryType: PersistPayload["moodEntry"]["entryType"] = voice
-        ? "voice"
-        : image
-          ? "photo"
-          : "text"
+      const entryType: PersistPayload["moodEntry"]["entryType"] = voice ? "voice" : "text"
 
       const payload: PersistPayload = {
         responses,
@@ -185,7 +144,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
           entryType,
           note: noteSegments.join("\n").slice(0, 1000),
           audioUrl: voice?.url ?? null,
-          photoUrl: image?.url ?? null,
+          photoUrl: null,
         },
         summary: {
           analysisSummary: analysis.analysisSummary,
