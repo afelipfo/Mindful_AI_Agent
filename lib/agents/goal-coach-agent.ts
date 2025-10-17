@@ -165,13 +165,13 @@ async function updateGoal(
   }
 
   const progressPercentage = Math.round(
-    ((input.currentProgress || currentGoal.current_value) / currentGoal.target_value) * 100
+    ((input.currentProgress || currentGoal.currentValue) / currentGoal.targetValue) * 100
   )
 
   const systemPrompt = `You are a supportive wellness goal coach. The user has updated their goal progress.
 
 Current goal: ${currentGoal.goal}
-Progress: ${input.currentProgress} ${currentGoal.unit} of ${currentGoal.target_value} ${currentGoal.unit} (${progressPercentage}%)
+Progress: ${input.currentProgress} ${currentGoal.unit} of ${currentGoal.targetValue} ${currentGoal.unit} (${progressPercentage}%)
 
 Provide:
 1. Acknowledgment of their progress
@@ -258,8 +258,8 @@ Return ONLY valid JSON:
   const goalsContext = goals.map((g) => ({
     goal: g.goal,
     progress: g.progress,
-    target: g.target_value,
-    current: g.current_value,
+    target: g.targetValue,
+    current: g.currentValue,
     unit: g.unit,
   }))
 
@@ -363,7 +363,7 @@ async function suggestAdjustment(
   const systemPrompt = `The user is struggling with their wellness goal. Suggest realistic adjustments.
 
 Current goal: ${currentGoal.goal}
-Progress: ${currentGoal.current_value} of ${currentGoal.target_value} ${currentGoal.unit} (${currentGoal.progress}%)
+Progress: ${currentGoal.currentValue} of ${currentGoal.targetValue} ${currentGoal.unit} (${currentGoal.progress}%)
 
 Suggest:
 1. Why adjustment might help
