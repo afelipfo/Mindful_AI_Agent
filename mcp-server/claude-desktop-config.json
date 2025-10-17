@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mindful-ai": {
+      "command": "node",
+      "args": [
+        "/Users/felipe/Downloads/Mindful_AI_Agent/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
