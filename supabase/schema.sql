@@ -435,13 +435,17 @@ BEGIN
   )
   RETURNING id INTO inserted_entry_id;
 
-  IF p_summary IS NOT NULL AND p_summary ? 'analysisSummary' AND NULLIF(p_summary ->> 'analysisSummary', '') IS NOT NULL THEN
+  -- Insert AI insights if summary analysis is provided
+  IF p_summary IS NOT NULL AND
+     jsonb_typeof(p_summary -> 'analysisSummary') = 'string' AND
+     NULLIF(p_summary ->> 'analysisSummary', '') IS NOT NULL THEN
     INSERT INTO ai_insights (user_id, insight_type, title, description, action)
     VALUES (
       p_user_id,
       'recommendation',
       CASE
-        WHEN NULLIF(p_summary ->> 'detectedMood', '') IS NOT NULL
+        WHEN jsonb_typeof(p_summary -> 'detectedMood') = 'string' AND
+             NULLIF(p_summary ->> 'detectedMood', '') IS NOT NULL
         THEN CONCAT('Check-in Analysis: ', INITCAP(p_summary ->> 'detectedMood'), ' Mood')
         ELSE 'Check-in Analysis'
       END,
