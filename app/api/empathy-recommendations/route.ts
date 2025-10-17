@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    console.log("[mindful-ai] Empathy API received body:", JSON.stringify(body, null, 2))
 
     // Validate input
     const validatedData = empathyRecommendationSchema.parse(body)
@@ -71,10 +72,15 @@ export async function POST(request: NextRequest) {
     }
 
     const combinedContext = contextSegments.join("\n")
+    console.log("[mindful-ai] Combined context:", combinedContext)
+    console.log("[mindful-ai] Detected mood before inference:", detectedMood)
+    console.log("[mindful-ai] Emotions list:", emotionsList)
+    console.log("[mindful-ai] Score:", score)
 
     if (!detectedMood) {
       if (typeof score === "number" && emotionsList.length > 0) {
         detectedMood = detectMoodCategory(emotionsList, score)
+        console.log("[mindful-ai] Detected mood from emotions+score:", detectedMood)
       } else if (combinedContext.trim().length > 0) {
         const inference = inferMoodFromText(combinedContext)
         detectedMood = inference.mood
@@ -82,10 +88,12 @@ export async function POST(request: NextRequest) {
         if (inference.emotions.length > 0) {
           emotionsList = Array.from(new Set([...emotionsList, ...inference.emotions]))
         }
+        console.log("[mindful-ai] Detected mood from text inference:", detectedMood)
       }
     }
 
     if (!detectedMood) {
+      console.error("[mindful-ai] Unable to determine mood - all detection methods failed")
       return NextResponse.json({ error: "Unable to determine mood from input" }, { status: 400 })
     }
 

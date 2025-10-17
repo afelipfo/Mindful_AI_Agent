@@ -255,6 +255,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
       })
 
       const audioUrl = await uploadAudio(audioBlob)
+      console.log("[mindful-ai] Audio uploaded:", audioUrl)
 
       try {
         const response = await fetch("/api/analyze/voice", {
@@ -265,13 +266,15 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
 
         if (response.ok) {
           const analysis = (await response.json()) as VoiceAnalysis
+          console.log("[mindful-ai] Voice analysis successful:", analysis)
           setVoiceAttachment({ url: audioUrl, analysis })
           toast({
             title: "Voice note added",
             description: analysis.summary || "We captured your voice reflection.",
           })
         } else {
-          console.error("Voice analysis failed", await response.json().catch(() => ({})))
+          const errorBody = await response.json().catch(() => ({}))
+          console.error("Voice analysis failed", errorBody)
           setVoiceAttachment({ url: audioUrl })
           toast({
             title: "Voice note saved",
@@ -382,6 +385,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
 
       if (voiceAttachment?.analysis) {
         const { analysis } = voiceAttachment
+        console.log("[mindful-ai] Processing voice attachment analysis:", analysis)
         if (analysis.summary) {
           contextSegments.push(`Voice insight: ${analysis.summary}`)
         } else if (analysis.transcript) {
@@ -391,6 +395,8 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         if (typeof analysis.moodScore === "number") {
           recentMoods.push(analysis.moodScore)
         }
+      } else {
+        console.log("[mindful-ai] No voice analysis available, voiceAttachment:", voiceAttachment)
       }
 
       if (imageAttachment?.analysis) {
@@ -401,8 +407,21 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         ;(analysis.emotions ?? []).forEach((emotion) => emotionSet.add(emotion.toLowerCase()))
       }
 
+      // Ensure context is never empty - use voice transcript or emotions as fallback
+      let finalContext = contextSegments.length > 0 ? contextSegments.join("\n").slice(-2000) : input.trim()
+
+      // If still empty and we have voice, use the transcript directly
+      if (!finalContext && voiceAttachment?.analysis?.transcript) {
+        finalContext = voiceAttachment.analysis.transcript
+      }
+
+      // If still empty, create context from emotions
+      if (!finalContext && emotionSet.size > 0) {
+        finalContext = `Feeling ${Array.from(emotionSet).join(", ")}`
+      }
+
       const payload: Record<string, unknown> = {
-        context: contextSegments.length > 0 ? contextSegments.join("\n").slice(-2000) : input.trim(),
+        context: finalContext || "Checking in on my wellbeing",
         emotions: Array.from(emotionSet),
         triggers: [],
         recentMoods,
@@ -457,6 +476,8 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
         }
       }
 
+      console.log("[mindful-ai] Sending empathy payload:", JSON.stringify(payload, null, 2))
+
       const response = await fetch("/api/empathy-recommendations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -465,6 +486,7 @@ export function QuickMoodAnalyzer({ className }: QuickMoodAnalyzerProps) {
 
       if (!response.ok) {
         const payloadBody = await response.json().catch(() => ({}))
+        console.error("[mindful-ai] Empathy API error:", payloadBody)
         throw new Error(payloadBody.error || "Failed to analyze mood")
       }
 
