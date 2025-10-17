@@ -624,6 +624,7 @@ export default function OnboardingPage() {
     isProcessing,
     currentQuestion,
     handleUserMessage,
+    resetFlow,
   } = useOnboardingFlow({
     questions: onboardingQuestions,
     stepTitles,
@@ -631,6 +632,28 @@ export default function OnboardingPage() {
   })
 
   const isCompleted = flowState === "completed"
+
+  const handleRetakeOnboarding = useCallback(() => {
+    console.log("[mindful-ai] Retaking onboarding questionnaire...")
+
+    // Clear empathy data
+    setEmpathyData(null)
+    sessionStorage.removeItem("mindful-empathy-data")
+
+    // Reset onboarding completion status
+    setIsOnboardingCompleted(false)
+
+    // Reset the flow using the hook's resetFlow method
+    if (resetFlow) {
+      resetFlow()
+    }
+
+    // Show toast
+    toast({
+      title: "Let's start fresh!",
+      description: "You can now retake the onboarding questionnaire.",
+    })
+  }, [resetFlow, toast])
 
   const sortedMoodEntries = useMemo(
     () =>
@@ -744,6 +767,7 @@ export default function OnboardingPage() {
               recommendations={recommendations}
               alerts={alerts}
               onDismissInsight={handleDismissInsight}
+              onRetakeOnboarding={handleRetakeOnboarding}
             />
           ) : (
             <ConversationInterface

@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { useMemo } from "react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, BarChart3, Sparkles, Zap, Brain, TrendingUp, AlertTriangle } from "lucide-react"
+import { Heart, BarChart3, Sparkles, Zap, Brain, TrendingUp, AlertTriangle, ArrowLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -86,6 +86,7 @@ interface OnboardingResultsProps {
   alerts: AIInsight[]
   onDismissInsight: (insight: AIInsight) => void
   todayLabel?: string
+  onRetakeOnboarding?: () => void
 }
 
 export function OnboardingResults({
@@ -109,6 +110,7 @@ export function OnboardingResults({
   alerts,
   onDismissInsight,
   todayLabel,
+  onRetakeOnboarding,
 }: OnboardingResultsProps) {
   const todayDisplay = useMemo(() => todayLabel ?? format(new Date(), "EEEE, MMMM d, yyyy"), [todayLabel])
 
@@ -184,8 +186,18 @@ export function OnboardingResults({
       <TabsContent value="dashboard" className="m-0 p-0">
         <div className="container mx-auto px-4 py-8 md:px-6">
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-1">Welcome back!</h1>
-            <p className="text-base text-text-muted">{todayDisplay}</p>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="flex-1">
+                <h1 className="text-3xl font-semibold mb-1">Welcome back!</h1>
+                <p className="text-base text-text-muted">{todayDisplay}</p>
+              </div>
+              {onRetakeOnboarding && (
+                <Button onClick={onRetakeOnboarding} variant="outline" className="flex-shrink-0">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Onboarding
+                </Button>
+              )}
+            </div>
           </div>
 
           {snapshotLoading && <div className="mb-6 text-sm text-text-muted">Refreshing your latest check-ins...</div>}

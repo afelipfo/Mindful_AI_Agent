@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, memo, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, Lightbulb, AlertTriangle, ChevronDown } from "lucide-react"
