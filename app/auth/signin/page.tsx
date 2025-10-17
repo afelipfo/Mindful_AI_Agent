@@ -71,10 +71,14 @@ function SignInForm() {
           </div>
 
           <div className="space-y-4">
-            <Button asChild className="w-full">
-              <Link href={callbackUrl}>
-                Continue to App
-              </Link>
+            <Button
+              className="w-full"
+              onClick={() => {
+                console.log("🔄 Redirecting to:", callbackUrl)
+                window.location.href = callbackUrl
+              }}
+            >
+              Continue to App
             </Button>
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
