@@ -17,17 +17,19 @@ function SignInForm() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [hasRedirected, setHasRedirected] = useState(false)
 
   // Get callback URL from query params, default to /onboarding
   const callbackUrl = searchParams.get("callbackUrl") || "/onboarding"
 
-  // If already authenticated, redirect immediately
+  // If already authenticated, redirect immediately (only once)
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && !hasRedirected) {
       console.log("✅ Already authenticated, redirecting to:", callbackUrl)
+      setHasRedirected(true)
       window.location.href = callbackUrl
     }
-  }, [status, callbackUrl])
+  }, [status, callbackUrl, hasRedirected])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,18 +38,34 @@ function SignInForm() {
 
     console.log("🔐 Starting sign in with callbackUrl:", callbackUrl)
 
-    // Let NextAuth handle EVERYTHING - including the redirect
-    await signIn("credentials", {
-      email,
-      password,
-      callbackUrl,
-    })
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        callbackUrl,
+        redirect: false,
+      })
 
-    // If we reach here, it means signIn failed (since redirect: true by default)
-    // NextAuth will redirect on success, so this only runs on failure
-    console.log("❌ Sign in failed - no redirect occurred")
-    setIsLoading(false)
-    setError("Authentication failed. Please check your credentials and try again.")
+      console.log("📋 Sign in result:", result)
+
+      if (result?.error) {
+        console.error("❌ Sign in error:", result.error)
+        setIsLoading(false)
+        setError(result.error)
+      } else if (result?.ok) {
+        console.log("✅ Sign in successful! Redirecting to:", callbackUrl)
+        // Redirect on success
+        window.location.href = callbackUrl
+      } else {
+        console.log("⚠️ Unexpected result:", result)
+        setIsLoading(false)
+        setError("Authentication failed. Please try again.")
+      }
+    } catch (err) {
+      console.error("💥 Sign in exception:", err)
+      setIsLoading(false)
+      setError("An unexpected error occurred. Please try again.")
+    }
   }
 
   // Show loading while checking session
@@ -57,15 +75,15 @@ function SignInForm() {
         <Card className="w-full max-w-md p-8">
           <div className="flex flex-col items-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="mt-4 text-sm text-text-secondary">Checking authentication...</p>
+            <p className="mt-4 text-sm text-text-secondary">Loading...</p>
           </div>
         </Card>
       </div>
     )
   }
 
-  // If already authenticated, show redirecting message
-  if (status === "authenticated") {
+  // If already authenticated and redirecting, show message
+  if (status === "authenticated" && hasRedirected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md p-8">
