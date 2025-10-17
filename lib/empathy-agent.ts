@@ -926,7 +926,7 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
     return fallbacks[detectedMood] ?? fallbacks.anxious
   }
 }
-async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
+export async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
   const validMood = ensureValidMood(input.detectedMood)
   const trimmedContext = input.context ? input.context.slice(-600) : undefined
   const normalizedInput: EmpathyInput = {

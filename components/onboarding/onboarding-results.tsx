@@ -98,7 +98,7 @@ export function OnboardingResults({
   energyHeatmapData,
   hasEnergyData,
   triggerFrequency,
-  copingEffectiveness,
+  copingEffectiveness: _copingEffectiveness,
   wellnessGoals,
   onRefreshSnapshot,
   moodEntryHistory,
