@@ -49,12 +49,11 @@ export default function SignInPage() {
           setError(`Authentication failed: ${result.error}`)
         }
       } else if (result?.ok) {
-        console.log("✅ Sign in successful, redirecting...")
-        // Add a small delay to ensure session is set
-        setTimeout(() => {
-          router.push("/onboarding")
-          router.refresh()
-        }, 100)
+        console.log("✅ Sign in successful, redirecting to onboarding...")
+        // Redirect to onboarding page - it will handle showing the right view
+        // based on whether onboarding is complete or not
+        router.push("/onboarding")
+        router.refresh()
       } else {
         console.log("⚠️ Unexpected result:", result)
         setError("Authentication failed. Please try again.")

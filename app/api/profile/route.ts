@@ -46,7 +46,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id,email,full_name,avatar_url,bio,created_at,timezone,preferred_language,notify_email,notify_push,notify_sms,daily_reminder,weekly_summary,reminder_time,theme_preference,sound_enabled",
+        "id,email,full_name,avatar_url,bio,created_at,timezone,preferred_language,notify_email,notify_push,notify_sms,daily_reminder,weekly_summary,reminder_time,theme_preference,sound_enabled,onboarding_completed",
       )
       .eq("id", session.user.id)
       .maybeSingle()
@@ -74,6 +74,7 @@ export async function GET() {
         reminderTime: data?.reminder_time ?? "09:00",
         themePreference: data?.theme_preference ?? "system",
         soundEnabled: data?.sound_enabled ?? true,
+        onboardingCompleted: data?.onboarding_completed ?? false,
       },
     })
   } catch (error) {
