@@ -2,7 +2,7 @@
 import { ChatOpenAI } from "@langchain/openai"
 import type { AgentState, GoalOutput } from "./types"
 import { saveExecutionTrace } from "./trace-store"
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 // ============================================================================
 // Goal Coach Input Types
@@ -415,7 +415,7 @@ Return ONLY valid JSON:
 // ============================================================================
 async function fetchGoal(goalId: string, userId: string): Promise<GoalOutput | null> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("wellness_goals")
@@ -446,7 +446,7 @@ async function fetchGoal(goalId: string, userId: string): Promise<GoalOutput | n
 
 async function fetchUserGoals(userId: string): Promise<GoalOutput[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("wellness_goals")

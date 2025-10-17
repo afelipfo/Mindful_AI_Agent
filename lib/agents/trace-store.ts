@@ -1,5 +1,5 @@
 // Execution trace storage and retrieval
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import type { ExecutionTraceEntry, AgentSession } from "./types"
 
 // ============================================================================
@@ -7,7 +7,7 @@ import type { ExecutionTraceEntry, AgentSession } from "./types"
 // ============================================================================
 export async function saveExecutionTrace(trace: ExecutionTraceEntry): Promise<void> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("execution_traces").insert({
       session_id: trace.sessionId,
@@ -40,7 +40,7 @@ export async function getSessionTraces(
   userId: string
 ): Promise<ExecutionTraceEntry[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("execution_traces")
@@ -83,7 +83,7 @@ export async function getUserTraces(
   limit: number = 50
 ): Promise<ExecutionTraceEntry[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("execution_traces")
@@ -127,7 +127,7 @@ export async function createAgentSession(
   context: Record<string, unknown> = {}
 ): Promise<string | null> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("agent_sessions")
@@ -160,7 +160,7 @@ export async function updateAgentSessionStatus(
   status: "active" | "completed" | "failed" | "timeout"
 ): Promise<void> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const updateData: Record<string, unknown> = {
       status,
@@ -192,7 +192,7 @@ export async function getAgentSession(
   userId: string
 ): Promise<AgentSession | null> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("agent_sessions")
@@ -231,7 +231,7 @@ export async function getAgentSession(
 // ============================================================================
 export async function getUserActiveSessions(userId: string): Promise<AgentSession[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("agent_sessions")
@@ -284,7 +284,7 @@ export async function getAgentPerformanceStats(
   userId: string
 ): Promise<AgentPerformanceStats[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("agent_performance_summary")

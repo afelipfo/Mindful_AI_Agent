@@ -1,5 +1,5 @@
 // Tool registry loader - Dynamic tool discovery from database
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import type { ToolDefinition } from "../types"
 
@@ -8,7 +8,7 @@ import type { ToolDefinition } from "../types"
 // ============================================================================
 export async function loadToolRegistry(): Promise<ToolDefinition[]> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("tool_registry")
@@ -157,7 +157,7 @@ export async function registerTool(
   tool: Omit<ToolDefinition, "isActive">
 ): Promise<boolean> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("tool_registry").insert({
       tool_name: tool.name,
@@ -188,7 +188,7 @@ export async function registerTool(
 // ============================================================================
 export async function deactivateTool(toolName: string): Promise<boolean> {
   try {
-    const supabase = createServerClient()
+    const supabase = await createClient()
 
     const { error } = await supabase
       .from("tool_registry")
