@@ -11,25 +11,14 @@ import { Brain, Loader2 } from "lucide-react"
 
 function SignInForm() {
   const { data: session, status } = useSession()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [hasRedirected, setHasRedirected] = useState(false)
 
   // Get callback URL from query params, default to /onboarding
   const callbackUrl = searchParams.get("callbackUrl") || "/onboarding"
-
-  // If already authenticated, redirect immediately (only once)
-  useEffect(() => {
-    if (status === "authenticated" && !hasRedirected) {
-      console.log("✅ Already authenticated, redirecting to:", callbackUrl)
-      setHasRedirected(true)
-      window.location.href = callbackUrl
-    }
-  }, [status, callbackUrl, hasRedirected])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,7 +43,7 @@ function SignInForm() {
         setError(result.error)
       } else if (result?.ok) {
         console.log("✅ Sign in successful! Redirecting to:", callbackUrl)
-        // Redirect on success
+        // Force a full page reload to ensure session is loaded properly
         window.location.href = callbackUrl
       } else {
         console.log("⚠️ Unexpected result:", result)
@@ -68,28 +57,30 @@ function SignInForm() {
     }
   }
 
-  // Show loading while checking session
-  if (status === "loading") {
+  // If already authenticated, show a message instead of auto-redirecting
+  if (status === "authenticated") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md p-8">
-          <div className="flex flex-col items-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="mt-4 text-sm text-text-secondary">Loading...</p>
+          <div className="flex flex-col items-center mb-8">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Brain className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold text-center">Already Signed In</h1>
+            <p className="text-text-secondary text-center mt-2">You're already authenticated</p>
           </div>
-        </Card>
-      </div>
-    )
-  }
 
-  // If already authenticated and redirecting, show message
-  if (status === "authenticated" && hasRedirected) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md p-8">
-          <div className="flex flex-col items-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="mt-4 text-sm text-text-secondary">Redirecting...</p>
+          <div className="space-y-4">
+            <Button asChild className="w-full">
+              <Link href={callbackUrl}>
+                Continue to App
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/">
+                Back to Home
+              </Link>
+            </Button>
           </div>
         </Card>
       </div>

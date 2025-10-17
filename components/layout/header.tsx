@@ -116,7 +116,12 @@ export function Header({ onCheckInClick }: HeaderProps = {}) {
               )}
             </>
           ) : (
-            renderUserMenu()
+            <>
+              <Button asChild variant="ghost" className="hidden md:inline-flex">
+                <Link href="/onboarding">Dashboard</Link>
+              </Button>
+              {renderUserMenu()}
+            </>
           )}
 
           <button

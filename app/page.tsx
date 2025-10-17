@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { Brain, Heart, Zap, TrendingUp, Mic, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Header } from "@/components/layout/header"
@@ -45,6 +46,9 @@ function TimelineItem({ step, icon, title, description }: TimelineItemProps) {
 }
 
 export default function LandingPage() {
+  const { status } = useSession()
+  const isAuthenticated = status === "authenticated"
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -65,8 +69,8 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col items-center justify-center gap-4 animate-fade-in [animation-delay:300ms] lg:items-start lg:justify-start">
               <Button asChild size="lg" className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
-                <Link href="/auth/signin?callbackUrl=%2Fonboarding" prefetch={false}>
-                  Start full onboarding
+                <Link href={isAuthenticated ? "/onboarding" : "/auth/signin?callbackUrl=%2Fonboarding"} prefetch={false}>
+                  {isAuthenticated ? "Go to Dashboard" : "Start full onboarding"}
                 </Link>
               </Button>
               <p className="text-sm text-text-muted">Prefer a faster check-in? Try the analyzer alongside.</p>
