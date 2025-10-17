@@ -4,18 +4,24 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { createClient } from "@supabase/supabase-js"
 
 const createSupabaseClient = () => {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return null
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables:", {
+      hasUrl: !!supabaseUrl,
+      hasAnonKey: !!supabaseAnonKey,
+    })
+    throw new Error("Supabase configuration is missing. Please check your environment variables.")
   }
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   })
 }
-
-const supabase = createSupabaseClient()
 
 export const authOptions: NextAuthOptions = {
   adapter:
@@ -37,11 +43,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required")
         }
 
-        if (!supabase) {
-          throw new Error("Authentication not configured")
-        }
-
         try {
+          // Create a fresh Supabase client for each authentication attempt
+          const supabase = createSupabaseClient()
+
           const { data, error } = await supabase.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,
