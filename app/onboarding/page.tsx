@@ -324,6 +324,25 @@ export default function OnboardingPage() {
   const [snapshot, setSnapshot] = useState<WellnessSnapshot>(getEmptyWellnessSnapshot())
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
 
+  // Load empathy data from sessionStorage on mount (only if onboarding was completed)
+  useEffect(() => {
+    const stored = sessionStorage.getItem("mindful-empathy-data")
+    const onboardingCompleted = sessionStorage.getItem("mindful-onboarding-completed")
+
+    if (stored && onboardingCompleted === "true") {
+      try {
+        const parsed = JSON.parse(stored) as EmpathyResponse
+        setEmpathyData(parsed)
+        setActiveTab("empathy")
+        console.log("[mindful-ai] Loaded empathy data from sessionStorage:", parsed)
+      } catch (error) {
+        console.error("[mindful-ai] Failed to parse stored empathy data:", error)
+        sessionStorage.removeItem("mindful-empathy-data")
+        sessionStorage.removeItem("mindful-onboarding-completed")
+      }
+    }
+  }, [])
+
   const loadSnapshot = useCallback(async () => {
     try {
       setIsSnapshotLoading(true)
@@ -496,9 +515,12 @@ export default function OnboardingPage() {
           throw new Error("Empathy response is null")
         }
 
+        // Store empathy data in both state and sessionStorage
         setEmpathyData(empathy)
+        sessionStorage.setItem("mindful-empathy-data", JSON.stringify(empathy))
+        sessionStorage.setItem("mindful-onboarding-completed", "true")
         setActiveTab("empathy")
-        console.log("[mindful-ai] ✅ Empathy data set successfully!")
+        console.log("[mindful-ai] ✅ Empathy data set successfully and saved to sessionStorage!")
 
         if (empathy.warnings?.length) {
           toast({
