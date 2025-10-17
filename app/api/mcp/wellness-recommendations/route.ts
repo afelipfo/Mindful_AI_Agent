@@ -3,11 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
-// Import the wellness recommendations function
+// Import the wellness recommendations function from lib
 import {
   generateWellnessRecommendations,
   WellnessRecommendationsInputSchema,
-} from "@/mcp-server/src/tools/wellness-recommendations";
+} from "@/lib/mcp-tools";
 
 /**
  * MCP Wellness Recommendations API Route

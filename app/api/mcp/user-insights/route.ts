@@ -4,11 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-// Import the user insights function
+// Import the user insights function from lib
 import {
   generateUserInsights,
   UserInsightsInputSchema,
-} from "@/mcp-server/src/tools/user-insights";
+} from "@/lib/mcp-tools";
 
 /**
  * MCP User Insights API Route
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       // Transform database entries to match schema
       body.moodHistory = (moodEntries || []).map((entry) => ({
         date: entry.date || new Date().toISOString().split("T")[0],
-        mood: detectMoodFromScore(entry.mood_score) as any,
+        mood: detectMoodFromScore(entry.mood_score) as "anxious" | "happy" | "sad" | "tired" | "stressed" | "excited",
         moodScore: entry.mood_score || 5,
         energyLevel: entry.energy_level || 5,
         triggers: entry.triggers || [],
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET endpoint to retrieve tool information
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
     // Transform and generate insights
     const moodHistory = moodEntries.map((entry) => ({
       date: entry.date || new Date().toISOString().split("T")[0],
-      mood: detectMoodFromScore(entry.mood_score) as any,
+      mood: detectMoodFromScore(entry.mood_score) as "anxious" | "happy" | "sad" | "tired" | "stressed" | "excited",
       moodScore: entry.mood_score || 5,
       energyLevel: entry.energy_level || 5,
       triggers: entry.triggers || [],

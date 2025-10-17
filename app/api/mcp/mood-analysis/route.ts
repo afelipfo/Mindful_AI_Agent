@@ -3,9 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
-// Import the mood analysis function directly
-// In production, you might want to call the MCP server via IPC or HTTP
-import { analyzeMood, MoodAnalysisInputSchema } from "@/mcp-server/src/tools/mood-analysis";
+// Import the mood analysis function from lib
+import { analyzeMood, MoodAnalysisInputSchema } from "@/lib/mcp-tools";
 
 /**
  * MCP Mood Analysis API Route
