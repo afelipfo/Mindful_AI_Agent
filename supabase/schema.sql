@@ -435,14 +435,18 @@ BEGIN
   )
   RETURNING id INTO inserted_entry_id;
 
-  IF p_summary ? 'analysisSummary' AND NULLIF(p_summary ->> 'analysisSummary', '') IS NOT NULL THEN
+  IF p_summary IS NOT NULL AND p_summary ? 'analysisSummary' AND NULLIF(p_summary ->> 'analysisSummary', '') IS NOT NULL THEN
     INSERT INTO ai_insights (user_id, insight_type, title, description, action)
     VALUES (
       p_user_id,
       'recommendation',
-      CONCAT('Mood insight', CASE WHEN NULLIF(p_summary ->> 'detectedMood', '') IS NOT NULL THEN ': ' || p_summary ->> 'detectedMood' ELSE '' END),
+      CASE
+        WHEN NULLIF(p_summary ->> 'detectedMood', '') IS NOT NULL
+        THEN CONCAT('Check-in Analysis: ', INITCAP(p_summary ->> 'detectedMood'), ' Mood')
+        ELSE 'Check-in Analysis'
+      END,
       p_summary ->> 'analysisSummary',
-      'Review recommendations'
+      NULL
     )
     ON CONFLICT (user_id, description) DO NOTHING;
   END IF;
