@@ -10,10 +10,8 @@
     "declaration": false,
     "emitDeclarationOnly": false
   },
-  "include": [],
-  "files": [
-    "lib/analytics.ts",
-    "tests/analytics.test.ts",
-    "types/wellness.ts"
+  "include": [
+    "tests/**/*.ts",
+    "types/**/*.d.ts"
   ]
 }

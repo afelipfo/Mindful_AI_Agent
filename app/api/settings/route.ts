@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { z, ZodError } from "zod"
 import { authOptions } from "@/lib/auth"
 import { tryCreateAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const updateSettingsSchema = z
   .object({
@@ -23,12 +24,12 @@ const updateSettingsSchema = z
   })
   .strict()
 
-function ensureSupabaseConfigured() {
-  const client = tryCreateAdminClient()
-  if (!client) {
-    throw new Error("Supabase configuration missing")
+async function getSupabaseClient() {
+  const admin = tryCreateAdminClient()
+  if (admin) {
+    return admin
   }
-  return client
+  return await createServerClient()
 }
 
 export async function GET() {
@@ -38,7 +39,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = ensureSupabaseConfigured()
+    const supabase = await getSupabaseClient()
     const { data, error } = await supabase
       .from("profiles")
       .select(
@@ -82,7 +83,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const parsed = updateSettingsSchema.parse(body)
 
-    const supabase = ensureSupabaseConfigured()
+    const supabase = await getSupabaseClient()
 
     const updates: Record<string, string | boolean | null> = {}
 

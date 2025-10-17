@@ -17,7 +17,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import type { EmpathyResponse } from "@/lib/empathy-agent"
 
 export type EmpathyRecommendation = EmpathyResponse

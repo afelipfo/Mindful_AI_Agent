@@ -9,7 +9,7 @@ import { EmpathyRecommendations, EmpathyRecommendation } from "@/components/chec
 import { VoiceRecorder } from "@/components/check-in/voice-recorder"
 import { PhotoCapture } from "@/components/check-in/photo-capture"
 import { uploadAudio, uploadImage } from "@/lib/upload"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 interface QuickMoodAnalyzerProps {
   className?: string

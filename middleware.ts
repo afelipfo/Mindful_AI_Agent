@@ -21,6 +21,5 @@ export const config = {
     '/dashboard/:path*',
     '/api/mood-entries/:path*',
     '/api/wellness-goals/:path*',
-    '/api/onboarding-responses/:path*',
   ],
 }

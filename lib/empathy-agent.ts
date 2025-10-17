@@ -1,5 +1,7 @@
 // Empathy recommendations agent - generates personalized wellness suggestions
 
+import { retryFetch } from "./retry"
+
 export type MoodCategory = "anxious" | "happy" | "sad" | "tired" | "stressed" | "excited"
 
 interface EmpathyInput {
@@ -64,6 +66,7 @@ export interface EmpathyResponse extends RecommendationSet {
   confidence: number
   analysisSummary: string
   analysisSources: AnalysisSource[]
+  warnings?: string[]
 }
 
 interface OpenLibraryDoc {
@@ -75,6 +78,33 @@ interface OpenLibraryDoc {
 
 interface OpenLibraryResponse {
   docs?: OpenLibraryDoc[]
+}
+
+interface SpotifyArtist {
+  name: string
+}
+
+interface SpotifyTrack {
+  name: string
+  artists: SpotifyArtist[]
+  external_urls: { spotify: string }
+}
+
+interface SpotifyRecommendationResponse {
+  tracks: SpotifyTrack[]
+}
+
+interface FoursquarePlace {
+  name?: string
+  location?: {
+    formatted_address?: string
+    lat?: number
+    lng?: number
+  }
+}
+
+interface FoursquareResponse {
+  results: FoursquarePlace[]
 }
 
 type QuotableRandomResponse = Array<{ content: string; author: string }>
@@ -520,6 +550,7 @@ function ensureValidMood(mood: string): MoodCategory {
 
 async function generatePersonalizedEmpathy(
   input: EmpathyInput,
+  warnings?: string[],
 ): Promise<Pick<RecommendationSet, "empathyMessage" | "recommendation">> {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -539,23 +570,27 @@ async function generatePersonalizedEmpathy(
 
     const userPrompt = `Mood: ${input.detectedMood}, Score: ${input.moodScore}/10, Energy: ${input.energyLevel}/10${input.context ? `, Context: "${input.context}"` : ""}`
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    const response = await retryFetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 300,
+          response_format: { type: "json_object" },
+        }),
       },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 300,
-        response_format: { type: "json_object" },
-      }),
-    })
+      { retries: 2 },
+    )
 
     if (!response.ok) {
       throw new Error("OpenAI API request failed")
@@ -567,6 +602,7 @@ async function generatePersonalizedEmpathy(
     return result
   } catch (error) {
     console.error("[v0] OpenAI empathy generation error:", error)
+    warnings?.push("Generated empathy message using fallback copy.")
     const fallback = empathyResponses[input.detectedMood]
     return {
       empathyMessage: fallback.empathyMessage,
@@ -575,7 +611,7 @@ async function generatePersonalizedEmpathy(
   }
 }
 
-async function getMusicRecommendation(detectedMood: MoodCategory) {
+async function getMusicRecommendation(detectedMood: MoodCategory, warnings?: string[]) {
   try {
     // Mood to Spotify audio features mapping
     const moodFeatures: Record<string, { valence: number; energy: number; tempo: { min: number; max: number } }> = {
@@ -593,15 +629,18 @@ async function getMusicRecommendation(detectedMood: MoodCategory) {
       throw new Error("Spotify credentials not configured")
     }
 
-    // Get Spotify access token
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString("base64")}`,
+    const tokenResponse = await retryFetch(
+      "https://accounts.spotify.com/api/token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString("base64")}`,
+        },
+        body: "grant_type=client_credentials",
       },
-      body: "grant_type=client_credentials",
-    })
+      { retries: 2 },
+    )
 
     if (!tokenResponse.ok) {
       throw new Error("Failed to get Spotify token")
@@ -609,18 +648,21 @@ async function getMusicRecommendation(detectedMood: MoodCategory) {
 
     const { access_token } = await tokenResponse.json()
 
-    // Get music recommendations
     const recommendationsUrl = `https://api.spotify.com/v1/recommendations?limit=1&seed_genres=ambient,classical,acoustic&target_valence=${features.valence}&target_energy=${features.energy}&min_tempo=${features.tempo.min}&max_tempo=${features.tempo.max}`
 
-    const musicResponse = await fetch(recommendationsUrl, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const musicResponse = await retryFetch(
+      recommendationsUrl,
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+      },
+      { retries: 2 },
+    )
 
     if (!musicResponse.ok) {
       throw new Error("Failed to get music recommendations")
     }
 
-    const data = await musicResponse.json()
+    const data = (await musicResponse.json()) as SpotifyRecommendationResponse
     const track = data.tracks?.[0]
 
     if (!track) {
@@ -636,17 +678,29 @@ async function getMusicRecommendation(detectedMood: MoodCategory) {
     }
   } catch (error) {
     console.error("[v0] Music recommendation error:", error)
-    return {
-      title: empathyResponses[detectedMood].music.title,
-      artist: empathyResponses[detectedMood].music.artist,
-      reason: empathyResponses[detectedMood].music.reason,
-      spotifyUrl: empathyResponses[detectedMood].music.spotifyUrl,
-      appleMusicUrl: empathyResponses[detectedMood].music.appleMusicUrl,
+    warnings?.push("Served saved music recommendation while Spotify was unavailable.")
+
+    const fallbacks: Record<string, { title: string; artist: string; reason: string; spotifyUrl: string; appleMusicUrl: string }> = {
+      anxious: {
+        title: "Weightless",
+        artist: "Marconi Union",
+        reason: "Scientifically proven to reduce anxiety by 65%",
+        spotifyUrl: "https://open.spotify.com/search/Weightless%20Marconi%20Union",
+        appleMusicUrl: "https://music.apple.com/search?term=Weightless%20Marconi%20Union",
+      },
+      happy: {
+        title: "Here Comes the Sun",
+        artist: "The Beatles",
+        reason: "Uplifting melody that amplifies positive energy",
+        spotifyUrl: "https://open.spotify.com/search/Here%20Comes%20the%20Sun%20Beatles",
+        appleMusicUrl: "https://music.apple.com/search?term=Here%20Comes%20the%20Sun%20Beatles",
+      },
     }
+
+    return fallbacks[detectedMood] ?? fallbacks.anxious
   }
 }
-
-async function getBookRecommendation(detectedMood: MoodCategory) {
+async function getBookRecommendation(detectedMood: MoodCategory, warnings?: string[]) {
   try {
     const moodSubjects: Record<string, string[]> = {
       anxious: ["anxiety", "mindfulness", "cognitive behavioral therapy"],
@@ -660,9 +714,10 @@ async function getBookRecommendation(detectedMood: MoodCategory) {
     const subjects = moodSubjects[detectedMood] || moodSubjects.anxious
     const randomSubject = subjects[Math.floor(Math.random() * subjects.length)]
 
-    const response = await fetch(
+    const response = await retryFetch(
       `https://openlibrary.org/search.json?subject=${encodeURIComponent(randomSubject)}&limit=20&sort=rating`,
       { next: { revalidate: 3600 } },
+      { retries: 2 },
     )
 
     if (!response.ok) {
@@ -690,17 +745,27 @@ async function getBookRecommendation(detectedMood: MoodCategory) {
     }
   } catch (error) {
     console.error("[v0] Book recommendation error:", error)
-    return {
-      title: empathyResponses[detectedMood].book.title,
-      author: empathyResponses[detectedMood].book.author,
-      relevance: empathyResponses[detectedMood].book.relevance,
-      amazonUrl: empathyResponses[detectedMood].book.amazonUrl,
-      coverUrl: undefined,
+    warnings?.push("Provided saved reading suggestion due to book API issues.")
+
+    const fallbacks: Record<string, { title: string; author: string; relevance: string; amazonUrl: string }> = {
+      anxious: {
+        title: "The Anxiety and Phobia Workbook",
+        author: "Edmund Bourne",
+        relevance: "Practical CBT techniques for managing anxiety",
+        amazonUrl: "https://www.amazon.com/s?k=The+Anxiety+and+Phobia+Workbook",
+      },
+      happy: {
+        title: "The Book of Joy",
+        author: "Dalai Lama",
+        relevance: "Deepens appreciation for joy and happiness",
+        amazonUrl: "https://www.amazon.com/s?k=The+Book+of+Joy",
+      },
     }
+
+    return fallbacks[detectedMood] ?? fallbacks.anxious
   }
 }
-
-async function getQuoteRecommendation(detectedMood: MoodCategory) {
+async function getQuoteRecommendation(detectedMood: MoodCategory, warnings?: string[]) {
   try {
     const moodTags: Record<string, string> = {
       anxious: "courage|wisdom|peace",
@@ -713,19 +778,21 @@ async function getQuoteRecommendation(detectedMood: MoodCategory) {
 
     const tags = moodTags[detectedMood] || moodTags.anxious
 
-    const response = await fetch(`https://api.quotable.io/random?tags=${tags}&maxLength=150`, {
-      next: { revalidate: 3600 },
-    })
+    const response = await retryFetch(
+      `https://api.quotable.io/quotes/random?tags=${tags}&maxLength=150`,
+      { next: { revalidate: 3600 } },
+      { retries: 2 },
+    )
 
     if (!response.ok) {
       throw new Error("Failed to fetch quote")
     }
 
-    const quoteResponse = (await response.json()) as QuotableRandomResponse
-    const quote = quoteResponse[0]
+    const data = (await response.json()) as QuotableRandomResponse
+    const quote = data[0]
 
-    if (!quote || !quote.content || !quote.author) {
-      throw new Error("Invalid quote data")
+    if (!quote) {
+      throw new Error("No quote found")
     }
 
     return {
@@ -734,14 +801,39 @@ async function getQuoteRecommendation(detectedMood: MoodCategory) {
     }
   } catch (error) {
     console.error("[v0] Quote recommendation error:", error)
-    return {
-      text: empathyResponses[detectedMood].quote.text,
-      author: empathyResponses[detectedMood].quote.author,
+    warnings?.push("Displayed saved quote due to quote service unavailability.")
+
+    const fallbacks: Record<string, { text: string; author: string }> = {
+      anxious: {
+        text: "You are braver than you believe, stronger than you seem, and smarter than you think.",
+        author: "A.A. Milne",
+      },
+      happy: {
+        text: "Happiness is not by chance, but by choice.",
+        author: "Jim Rohn",
+      },
+      sad: {
+        text: "The wound is the place where the light enters you.",
+        author: "Rumi",
+      },
+      tired: {
+        text: "Almost everything will work again if you unplug it for a few minutes, including you.",
+        author: "Anne Lamott",
+      },
+      stressed: {
+        text: "You can't calm the storm, so stop trying. What you can do is calm yourself. The storm will pass.",
+        author: "Timber Hawkeye",
+      },
+      excited: {
+        text: "The only way to do great work is to love what you do.",
+        author: "Steve Jobs",
+      },
     }
+
+    return fallbacks[detectedMood] ?? fallbacks.anxious
   }
 }
-
-async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: number, longitude?: number) {
+async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: number, longitude?: number, warnings?: string[]) {
   try {
     const moodPlaces: Record<string, { categories: string; type: string; reason: string; benefits: string }> = {
       anxious: {
@@ -785,7 +877,7 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
     const placeData = moodPlaces[detectedMood] || moodPlaces.anxious
 
     if (latitude && longitude && process.env.FOURSQUARE_API_KEY) {
-      const response = await fetch(
+      const response = await retryFetch(
         `https://api.foursquare.com/v3/places/search?categories=${placeData.categories}&ll=${latitude},${longitude}&radius=5000&limit=1&sort=POPULARITY`,
         {
           headers: {
@@ -793,10 +885,11 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
             Accept: "application/json",
           },
         },
+        { retries: 2 },
       )
 
       if (response.ok) {
-        const data = await response.json()
+        const data = (await response.json()) as FoursquareResponse
         if (data.results && data.results.length > 0) {
           const place = data.results[0]
           return {
@@ -804,6 +897,9 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
             reason: placeData.reason,
             benefits: placeData.benefits,
             address: place.location?.formatted_address,
+            coordinates: place.location?.lat && place.location?.lng
+              ? { lat: place.location.lat, lng: place.location.lng }
+              : undefined,
           }
         }
       }
@@ -812,11 +908,25 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
     return placeData
   } catch (error) {
     console.error("[v0] Place recommendation error:", error)
-    return empathyResponses[detectedMood].place
+    warnings?.push("Provided saved place suggestion due to place lookup failure.")
+
+    const fallbacks: Record<string, { type: string; reason: string; benefits: string }> = {
+      anxious: {
+        type: "A botanical garden",
+        reason: "Nature exposure reduces cortisol by 21%",
+        benefits: "Green spaces calm the nervous system",
+      },
+      happy: {
+        type: "A hilltop viewpoint",
+        reason: "Expansive views amplify positive emotions",
+        benefits: "Height enhances feelings of possibility",
+      },
+    }
+
+    return fallbacks[detectedMood] ?? fallbacks.anxious
   }
 }
-
-export async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
+async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
   const validMood = ensureValidMood(input.detectedMood)
   const trimmedContext = input.context ? input.context.slice(-600) : undefined
   const normalizedInput: EmpathyInput = {
@@ -829,16 +939,17 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
   const confidence = calculateConfidence(normalizedInput)
   const analysisSummary = buildAnalysisSummary(normalizedInput, validMood, confidence)
   const analysisSources = buildAnalysisSources(normalizedInput)
+  const warnings: string[] = []
 
   try {
     console.log("[v0] Generating empathy recommendations for mood:", validMood)
 
     const results = await Promise.allSettled([
-      generatePersonalizedEmpathy(normalizedInput),
-      getMusicRecommendation(validMood),
-      getBookRecommendation(validMood),
-      getQuoteRecommendation(validMood),
-      getPlaceRecommendation(validMood, normalizedInput.latitude, normalizedInput.longitude),
+      generatePersonalizedEmpathy(normalizedInput, warnings),
+      getMusicRecommendation(validMood, warnings),
+      getBookRecommendation(validMood, warnings),
+      getQuoteRecommendation(validMood, warnings),
+      getPlaceRecommendation(validMood, normalizedInput.latitude, normalizedInput.longitude, warnings),
     ])
 
     console.log(
@@ -877,18 +988,21 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
       music: music || empathyResponses[validMood].music,
       book: book || empathyResponses[validMood].book,
       place: place || empathyResponses[validMood].place,
+      warnings: warnings.length ? warnings : undefined,
     }
 
     console.log("[v0] Successfully generated empathy recommendations")
     return response
   } catch (error) {
     console.error("[v0] Error generating empathy recommendations:", error)
+    warnings.push("Displayed saved recommendations because live services were unavailable.")
     return {
       detectedMood: validMood,
       confidence,
       analysisSummary,
       analysisSources,
       ...empathyResponses[validMood],
+      warnings,
     }
   }
 }
