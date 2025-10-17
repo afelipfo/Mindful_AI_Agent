@@ -24,6 +24,7 @@ const updateProfileSchema = z
       .url("Avatar must be a valid URL")
       .or(z.literal(""))
       .optional(),
+    lastEmpathyData: z.any().optional(),
   })
   .strict()
 
@@ -46,7 +47,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id,email,full_name,avatar_url,bio,created_at,timezone,preferred_language,notify_email,notify_push,notify_sms,daily_reminder,weekly_summary,reminder_time,theme_preference,sound_enabled,onboarding_completed",
+        "id,email,full_name,avatar_url,bio,created_at,timezone,preferred_language,notify_email,notify_push,notify_sms,daily_reminder,weekly_summary,reminder_time,theme_preference,sound_enabled,onboarding_completed,last_empathy_data",
       )
       .eq("id", session.user.id)
       .maybeSingle()
@@ -75,6 +76,7 @@ export async function GET() {
         themePreference: data?.theme_preference ?? "system",
         soundEnabled: data?.sound_enabled ?? true,
         onboardingCompleted: data?.onboarding_completed ?? false,
+        lastEmpathyData: data?.last_empathy_data ?? null,
       },
     })
   } catch (error) {
@@ -95,7 +97,7 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = await getSupabaseClient()
 
-    const updates: Record<string, string | null> = {}
+    const updates: Record<string, string | null | unknown> = {}
     if (typeof parsed.fullName === "string") {
       updates.full_name = parsed.fullName
     }
@@ -104,6 +106,9 @@ export async function PATCH(request: NextRequest) {
     }
     if (typeof parsed.avatarUrl === "string") {
       updates.avatar_url = parsed.avatarUrl.length > 0 ? parsed.avatarUrl : null
+    }
+    if (parsed.lastEmpathyData !== undefined) {
+      updates.last_empathy_data = parsed.lastEmpathyData
     }
 
     if (Object.keys(updates).length === 0) {

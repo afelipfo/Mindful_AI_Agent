@@ -353,6 +353,17 @@ export default function OnboardingPage() {
                 sessionStorage.removeItem("mindful-empathy-data")
               }
             }
+
+            // If no sessionStorage data, try loading from profile
+            if (!stored && profile.lastEmpathyData) {
+              try {
+                setEmpathyData(profile.lastEmpathyData as EmpathyResponse)
+                sessionStorage.setItem("mindful-empathy-data", JSON.stringify(profile.lastEmpathyData))
+                console.log("[mindful-ai] Loaded empathy data from profile")
+              } catch (error) {
+                console.error("[mindful-ai] Failed to load empathy data from profile:", error)
+              }
+            }
           } else {
             console.log("[mindful-ai] User hasn't completed onboarding, showing questionnaire")
             setIsOnboardingCompleted(false)
@@ -552,12 +563,24 @@ export default function OnboardingPage() {
           throw new Error("Empathy response is null")
         }
 
-        // Store empathy data in both state and sessionStorage
+        // Store empathy data in state, sessionStorage, and database
         setEmpathyData(empathy)
         sessionStorage.setItem("mindful-empathy-data", JSON.stringify(empathy))
         setIsOnboardingCompleted(true)
         setActiveTab("empathy")
         console.log("[mindful-ai] ✅ Empathy data set successfully and saved to sessionStorage!")
+
+        // Save empathy data to profile for persistence
+        try {
+          await fetch("/api/profile", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lastEmpathyData: empathy }),
+          })
+          console.log("[mindful-ai] ✅ Empathy data saved to profile")
+        } catch (empathyError) {
+          console.error("[mindful-ai] ⚠️ Failed to save empathy data to profile:", empathyError)
+        }
 
         if (empathy.warnings?.length) {
           toast({

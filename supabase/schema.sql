@@ -275,6 +275,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weekly_summary BOOLEAN DEFAULT TRU
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS reminder_time TEXT DEFAULT '09:00';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS theme_preference TEXT DEFAULT 'system';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sound_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_empathy_data JSONB;
 
 -- Ensure unique onboarding steps per user
 DO $$
