@@ -467,9 +467,12 @@ export default function OnboardingPage() {
         const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
 
         console.log("[mindful-ai] handleFlowComplete: Fetching empathy recommendations...")
+        console.log("[mindful-ai] Empathy payload:", JSON.stringify(payload, null, 2))
         const empathy = await requestEmpathyRecommendations(payload)
+        console.log("[mindful-ai] Empathy response received:", empathy)
         setEmpathyData(empathy)
         setActiveTab("empathy")
+        console.log("[mindful-ai] Empathy data set, activeTab set to empathy")
 
         if (empathy.warnings?.length) {
           toast({
@@ -489,6 +492,17 @@ export default function OnboardingPage() {
         })
       } catch (error) {
         console.error("[mindful-ai] onboarding flow completion error:", error)
+
+        // Even if there's an error, try to generate basic empathy data
+        try {
+          const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
+          const empathy = await requestEmpathyRecommendations(payload)
+          setEmpathyData(empathy)
+          setActiveTab("empathy")
+        } catch (fallbackError) {
+          console.error("[mindful-ai] Fallback empathy generation failed:", fallbackError)
+        }
+
         toast({
           title: "Onboarding complete",
           description: "Your responses have been saved. Review your insights below.",
