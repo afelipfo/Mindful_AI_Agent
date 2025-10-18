@@ -1,6 +1,6 @@
 // Planner Agent - Dynamic tool selection using LangGraph
 import { ChatOpenAI } from "@langchain/openai"
-import { StateGraph, type StateGraphArgs } from "@langchain/langgraph"
+import { StateGraph, type StateGraphArgs, START, END } from "@langchain/langgraph"
 import type { AgentState, PlannerResponse } from "./types"
 import {
   loadToolRegistry,
@@ -327,11 +327,12 @@ Format your response as natural conversation, not JSON.`
   // ============================================================================
   // Define workflow sequence
   // ============================================================================
-  workflow.addEdge("plan" as any, "execute" as any)
-  workflow.addEdge("execute" as any, "respond" as any)
-  workflow.addEdge("respond" as any, "__end__")
+  workflow.addEdge(START, "plan")
+  workflow.addEdge("plan", "execute")
+  workflow.addEdge("execute", "respond")
+  workflow.addEdge("respond", END)
 
-  return workflow.compile({ entryPoint: "plan" as any })
+  return workflow.compile()
 }
 
 // ============================================================================
