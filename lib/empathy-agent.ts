@@ -145,6 +145,73 @@ export function detectMoodCategory(emotions: string[], moodScore: number): MoodC
   return "anxious"
 }
 
+// Infer mood from text (used by voice/text/image analysis)
+export function inferMoodFromText(text: string): { mood: MoodCategory; score: number; emotions: string[] } {
+  const normalized = text.toLowerCase()
+
+  const textMoodKeywords: Record<MoodCategory, string[]> = {
+    anxious: ["anxious", "worried", "nervous", "uneasy", "on edge", "overwhelmed", "panic"],
+    happy: ["happy", "grateful", "calm", "content", "peaceful", "good", "smiling"],
+    sad: ["sad", "down", "low", "blue", "lonely", "upset", "heartbroken"],
+    tired: ["tired", "exhausted", "fatigued", "drained", "sleepy", "worn out", "burned out"],
+    stressed: ["stressed", "pressure", "tense", "frustrated", "irritated", "rushed"],
+    excited: ["excited", "energized", "pumped", "thrilled", "motivated", "inspired"],
+  }
+
+  const moodBaseScore: Record<MoodCategory, number> = {
+    anxious: 3,
+    happy: 8,
+    sad: 3,
+    tired: 4,
+    stressed: 4,
+    excited: 8,
+  }
+
+  let bestMood: MoodCategory = "tired"
+  let bestMatches = 0
+  const matchedEmotions = new Set<string>()
+
+  for (const [mood, keywords] of Object.entries(textMoodKeywords)) {
+    let matches = 0
+    for (const keyword of keywords) {
+      if (normalized.includes(keyword)) {
+        matches++
+        matchedEmotions.add(keyword)
+      }
+    }
+    if (matches > bestMatches) {
+      bestMatches = matches
+      bestMood = mood as MoodCategory
+    }
+  }
+
+  let score = moodBaseScore[bestMood]
+
+  // Adjust score based on intensity modifiers
+  if (normalized.includes("very") || normalized.includes("really") || normalized.includes("extremely")) {
+    score += 1
+  }
+  if (normalized.includes("slightly") || normalized.includes("kind of") || normalized.includes("a little")) {
+    score -= 1
+  }
+
+  score = Math.min(10, Math.max(2, score))
+
+  if (matchedEmotions.size === 0) {
+    return {
+      mood: "tired",
+      score: 5,
+      emotions: [],
+    }
+  }
+
+  return {
+    mood: bestMood,
+    score,
+    emotions: Array.from(matchedEmotions).slice(0, 5),
+  }
+}
+
 // Ensure valid mood category
 function ensureValidMood(mood: string): MoodCategory {
   const validMoods: MoodCategory[] = ["anxious", "happy", "sad", "tired", "stressed", "excited"]
