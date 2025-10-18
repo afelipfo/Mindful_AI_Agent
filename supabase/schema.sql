@@ -333,6 +333,18 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS theme_preference TEXT DEFAULT 'sys
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sound_enabled BOOLEAN DEFAULT TRUE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_empathy_data JSONB;
 
+-- Add therapeutic questionnaire data columns to mood_entries
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS symptom_anxiety INTEGER CHECK (symptom_anxiety >= 0 AND symptom_anxiety <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS symptom_sadness INTEGER CHECK (symptom_sadness >= 0 AND symptom_sadness <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS symptom_stress INTEGER CHECK (symptom_stress >= 0 AND symptom_stress <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS symptom_loneliness INTEGER CHECK (symptom_loneliness >= 0 AND symptom_loneliness <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS symptom_suicide_trends INTEGER CHECK (symptom_suicide_trends >= 0 AND symptom_suicide_trends <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS has_previous_therapy BOOLEAN;
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS therapy_duration TEXT;
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS therapy_type TEXT;
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS therapeutic_relationship_importance INTEGER CHECK (therapeutic_relationship_importance >= 1 AND therapeutic_relationship_importance <= 5);
+ALTER TABLE mood_entries ADD COLUMN IF NOT EXISTS patient_readiness INTEGER CHECK (patient_readiness >= 1 AND patient_readiness <= 5);
+
 -- Ensure unique onboarding steps per user
 DO $$
 BEGIN
@@ -450,7 +462,17 @@ BEGIN
     note,
     audio_url,
     photo_url,
-    entry_timestamp
+    entry_timestamp,
+    symptom_anxiety,
+    symptom_sadness,
+    symptom_stress,
+    symptom_loneliness,
+    symptom_suicide_trends,
+    has_previous_therapy,
+    therapy_duration,
+    therapy_type,
+    therapeutic_relationship_importance,
+    patient_readiness
   )
   VALUES (
     p_user_id,
@@ -488,7 +510,32 @@ BEGIN
     entry_note,
     entry_audio,
     entry_photo,
-    entry_timestamp
+    entry_timestamp,
+    -- Therapeutic questionnaire data
+    CASE WHEN (p_mood_entry -> 'symptomRatings' ->> 'anxiety')::INTEGER IS NOT NULL
+         THEN GREATEST(0, LEAST(5, (p_mood_entry -> 'symptomRatings' ->> 'anxiety')::INTEGER))
+         ELSE NULL END,
+    CASE WHEN (p_mood_entry -> 'symptomRatings' ->> 'sadness')::INTEGER IS NOT NULL
+         THEN GREATEST(0, LEAST(5, (p_mood_entry -> 'symptomRatings' ->> 'sadness')::INTEGER))
+         ELSE NULL END,
+    CASE WHEN (p_mood_entry -> 'symptomRatings' ->> 'stress')::INTEGER IS NOT NULL
+         THEN GREATEST(0, LEAST(5, (p_mood_entry -> 'symptomRatings' ->> 'stress')::INTEGER))
+         ELSE NULL END,
+    CASE WHEN (p_mood_entry -> 'symptomRatings' ->> 'loneliness')::INTEGER IS NOT NULL
+         THEN GREATEST(0, LEAST(5, (p_mood_entry -> 'symptomRatings' ->> 'loneliness')::INTEGER))
+         ELSE NULL END,
+    CASE WHEN (p_mood_entry -> 'symptomRatings' ->> 'suicideTrends')::INTEGER IS NOT NULL
+         THEN GREATEST(0, LEAST(5, (p_mood_entry -> 'symptomRatings' ->> 'suicideTrends')::INTEGER))
+         ELSE NULL END,
+    (p_mood_entry -> 'therapyHistory' ->> 'hasPreviousTherapy')::BOOLEAN,
+    p_mood_entry -> 'therapyHistory' ->> 'duration',
+    p_mood_entry -> 'therapyHistory' ->> 'type',
+    CASE WHEN (p_mood_entry ->> 'therapeuticRelationshipImportance')::INTEGER IS NOT NULL
+         THEN GREATEST(1, LEAST(5, (p_mood_entry ->> 'therapeuticRelationshipImportance')::INTEGER))
+         ELSE NULL END,
+    CASE WHEN (p_mood_entry ->> 'patientReadiness')::INTEGER IS NOT NULL
+         THEN GREATEST(1, LEAST(5, (p_mood_entry ->> 'patientReadiness')::INTEGER))
+         ELSE NULL END
   )
   RETURNING id INTO inserted_entry_id;
 

@@ -23,44 +23,43 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 const onboardingQuestions = [
   {
-    question:
-      "Hi, I'm Mindful—your companion here. Could you walk me through what a typical day feels like for you right now?",
-    placeholder: "Tell me about the flow of a usual day...",
+    question: "What is the main issue or concern that brought you to therapy?",
+    placeholder: "Tell me what brings you here today...",
   },
   {
     question:
-      "Thanks for painting that picture. Checking in at this moment, how would you rate your mood and energy from 1-10? Feel free to mention any physical sensations you notice.",
-    placeholder: "Share how your mood and energy feel today...",
+      "Over the past two weeks, how often have you experienced symptoms such as:\n2.1. Anxiety\n2.2. Sadness\n2.3. Stress\n2.4. Loneliness\n2.5. Suicide trends\n\nPlease rate each from 0 (Not at all) to 5 (Nearly every day).",
+    placeholder: "Rate each symptom from 0-5...",
   },
   {
     question:
-      "Appreciate the reflection. Are there people, places, or situations that reliably lift you up—or weigh you down?",
-    placeholder: "Let me know what tends to raise or lower your mood...",
+      "Have you previously received therapy or mental health treatment? If yes, please specify:\n3.1. Duration\n3.2. Type",
+    placeholder: "Share your therapy history...",
   },
   {
     question:
-      "That insight helps a lot. When you need to reset or steady yourself, what habits, practices, or support systems do you lean on?",
-    placeholder: "Describe the strategies that help you cope...",
+      "How important is feeling understood and supported by your therapist to you? (1 = Not important, 5 = Very important)",
+    placeholder: "Rate from 1-5...",
   },
   {
     question:
-      "You're doing great. What personal wellness goals feel most important to you at the moment?",
-    placeholder: "Share the goals you want to focus on...",
+      "How ready do you feel to engage actively in therapy and work on your personal challenges? (1 = Not ready, 5 = Fully ready)",
+    placeholder: "Rate your readiness from 1-5...",
   },
   {
     question:
-      "Last step! What types of support usually resonate with you—guided practices, movement, journaling, quiet time, something else?",
-    placeholder: "Tell me what kinds of support feel good for you...",
+      "Please briefly describe your current living situation, key relationships, and support systems.",
+    placeholder: "Tell me about your current situation and support network...",
   },
 ]
 
 const stepTitles = [
-  "Personal Context",
-  "Current Mood",
-  "Triggers",
-  "Coping Mechanisms",
-  "Wellness Goals",
-  "Preferences",
+  "Presenting Problem",
+  "Current Symptoms",
+  "Therapeutic History",
+  "Relationship Expectations",
+  "Patient Involvement",
+  "Personal Background",
 ]
 
 const WINDOW_DAYS = 7
@@ -146,11 +145,33 @@ interface EmpathyRequestPayload {
     emotions?: string[]
     summary?: string
   }
+  // Therapeutic data
+  symptomRatings?: {
+    anxiety?: number
+    sadness?: number
+    stress?: number
+    loneliness?: number
+    suicideTrends?: number
+  }
+  therapyHistory?: {
+    hasPreviousTherapy?: boolean
+    duration?: string
+    type?: string
+  }
+  therapeuticRelationshipImportance?: number
+  patientReadiness?: number
+  presentingProblem?: string
 }
 
 const buildEmpathyPayload = (
   conversation: ConversationMessage[],
   latestMetadata?: MessageMetadata,
+  therapeuticData?: {
+    symptomRatings?: { anxiety?: number; sadness?: number; stress?: number; loneliness?: number; suicideTrends?: number }
+    therapyHistory?: { hasPreviousTherapy?: boolean; duration?: string; type?: string }
+    therapeuticRelationshipImportance?: number
+    patientReadiness?: number
+  },
 ): EmpathyRequestPayload => {
   console.log("[mindful-ai] Building empathy payload from conversation:", conversation.length, "messages")
 
@@ -282,6 +303,28 @@ const buildEmpathyPayload = (
   }
 
   payload.emotions = Array.from(emotionSet)
+
+  // Add therapeutic data if available
+  if (therapeuticData) {
+    if (therapeuticData.symptomRatings) {
+      payload.symptomRatings = therapeuticData.symptomRatings
+    }
+    if (therapeuticData.therapyHistory) {
+      payload.therapyHistory = therapeuticData.therapyHistory
+    }
+    if (therapeuticData.therapeuticRelationshipImportance) {
+      payload.therapeuticRelationshipImportance = therapeuticData.therapeuticRelationshipImportance
+    }
+    if (therapeuticData.patientReadiness) {
+      payload.patientReadiness = therapeuticData.patientReadiness
+    }
+  }
+
+  // Extract presenting problem from first response if available
+  const firstUserMessage = conversation.find((msg) => msg.role === "user")
+  if (firstUserMessage?.content) {
+    payload.presentingProblem = firstUserMessage.content.slice(0, 1000)
+  }
 
   return payload
 }
@@ -465,6 +508,106 @@ export default function OnboardingPage() {
     [markInsightAsRead],
   )
 
+  // Helper function to extract therapeutic data from responses
+  const extractTherapeuticData = useCallback((responsesByStep: Record<number, ConversationMessage>) => {
+    const therapeuticData: {
+      symptomRatings?: {
+        anxiety?: number
+        sadness?: number
+        stress?: number
+        loneliness?: number
+        suicideTrends?: number
+      }
+      therapyHistory?: {
+        hasPreviousTherapy?: boolean
+        duration?: string
+        type?: string
+      }
+      therapeuticRelationshipImportance?: number
+      patientReadiness?: number
+    } = {}
+
+    // Step 2: Current Symptoms - Parse symptom ratings
+    const symptomsResponse = responsesByStep[1] // Index 1 = Step 2
+    if (symptomsResponse?.content) {
+      const content = symptomsResponse.content.toLowerCase()
+      const symptomRatings: {
+        anxiety?: number
+        sadness?: number
+        stress?: number
+        loneliness?: number
+        suicideTrends?: number
+      } = {}
+
+      // Try to extract numeric ratings from text
+      const anxietyMatch = content.match(/anxiety[:\s]+(\d)/)
+      const sadnessMatch = content.match(/sadness[:\s]+(\d)/)
+      const stressMatch = content.match(/stress[:\s]+(\d)/)
+      const lonelinessMatch = content.match(/loneliness[:\s]+(\d)/)
+      const suicideMatch = content.match(/suicide[:\s]+(\d)/)
+
+      if (anxietyMatch) symptomRatings.anxiety = clamp(parseInt(anxietyMatch[1], 10), 0, 5)
+      if (sadnessMatch) symptomRatings.sadness = clamp(parseInt(sadnessMatch[1], 10), 0, 5)
+      if (stressMatch) symptomRatings.stress = clamp(parseInt(stressMatch[1], 10), 0, 5)
+      if (lonelinessMatch) symptomRatings.loneliness = clamp(parseInt(lonelinessMatch[1], 10), 0, 5)
+      if (suicideMatch) symptomRatings.suicideTrends = clamp(parseInt(suicideMatch[1], 10), 0, 5)
+
+      if (Object.keys(symptomRatings).length > 0) {
+        therapeuticData.symptomRatings = symptomRatings
+      }
+    }
+
+    // Step 3: Therapeutic History
+    const historyResponse = responsesByStep[2] // Index 2 = Step 3
+    if (historyResponse?.content) {
+      const content = historyResponse.content.toLowerCase()
+      const therapyHistory: { hasPreviousTherapy?: boolean; duration?: string; type?: string } = {}
+
+      // Check if user has previous therapy
+      const hasTherapy =
+        content.includes("yes") || content.includes("i have") || content.includes("previously")
+      const noTherapy = content.includes("no") || content.includes("never") || content.includes("haven't")
+
+      if (hasTherapy && !noTherapy) {
+        therapyHistory.hasPreviousTherapy = true
+
+        // Extract duration
+        const durationMatch = content.match(/duration[:\s]+([^.\n]+)/)
+        if (durationMatch) therapyHistory.duration = durationMatch[1].trim()
+
+        // Extract type
+        const typeMatch = content.match(/type[:\s]+([^.\n]+)/)
+        if (typeMatch) therapyHistory.type = typeMatch[1].trim()
+      } else if (noTherapy) {
+        therapyHistory.hasPreviousTherapy = false
+      }
+
+      if (Object.keys(therapyHistory).length > 0) {
+        therapeuticData.therapyHistory = therapyHistory
+      }
+    }
+
+    // Step 4: Therapeutic Relationship Expectations
+    const relationshipResponse = responsesByStep[3] // Index 3 = Step 4
+    if (relationshipResponse?.content) {
+      const match = relationshipResponse.content.match(/(\d)/)
+      if (match) {
+        therapeuticData.therapeuticRelationshipImportance = clamp(parseInt(match[1], 10), 1, 5)
+      }
+    }
+
+    // Step 5: Patient Involvement and Commitment
+    const readinessResponse = responsesByStep[4] // Index 4 = Step 5
+    if (readinessResponse?.content) {
+      const match = readinessResponse.content.match(/(\d)/)
+      if (match) {
+        therapeuticData.patientReadiness = clamp(parseInt(match[1], 10), 1, 5)
+      }
+    }
+
+    return therapeuticData
+  }, [])
+
   const persistCheckIn = useCallback(
     async (
       conversation: ConversationMessage[],
@@ -494,6 +637,9 @@ export default function OnboardingPage() {
           })
           .filter((response): response is NonNullable<typeof response> => Boolean(response))
 
+        // Extract therapeutic data from responses
+        const therapeuticData = extractTherapeuticData(responsesByStep)
+
         const requestBody = {
           responses,
           moodEntry: {
@@ -508,6 +654,8 @@ export default function OnboardingPage() {
             photoUrl,
             date: new Date().toISOString().slice(0, 10),
             timestamp: new Date().toISOString(),
+            // Add therapeutic data
+            ...therapeuticData,
           },
           summary: {
             analysisSummary: empathy.analysisSummary,
@@ -532,7 +680,7 @@ export default function OnboardingPage() {
         console.error("[mindful-ai] Failed to persist onboarding data:", error)
       }
     },
-    [loadSnapshot],
+    [loadSnapshot, extractTherapeuticData],
   )
 
   const handleFlowComplete = useCallback(
@@ -549,7 +697,11 @@ export default function OnboardingPage() {
       console.log("[mindful-ai] Conversation:", conversation)
       console.log("[mindful-ai] ResponsesByStep:", responsesByStep)
 
-      const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata)
+      // Extract therapeutic data from responses
+      const therapeuticData = extractTherapeuticData(responsesByStep)
+      console.log("[mindful-ai] Therapeutic data extracted:", therapeuticData)
+
+      const payload = buildEmpathyPayload(conversation, latestUserMessage?.metadata, therapeuticData)
       console.log("[mindful-ai] Empathy payload built:", JSON.stringify(payload, null, 2))
 
       // ALWAYS generate empathy data - this is critical!

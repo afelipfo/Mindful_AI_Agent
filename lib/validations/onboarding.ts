@@ -9,6 +9,24 @@ export const onboardingMetadataSchema = z
     audioUrl: z.string().url().optional(),
     photoUrl: z.string().url().optional(),
     energy: z.number().optional(),
+    // New fields for therapeutic questionnaire
+    symptomRatings: z
+      .object({
+        anxiety: z.number().min(0).max(5).optional(),
+        sadness: z.number().min(0).max(5).optional(),
+        stress: z.number().min(0).max(5).optional(),
+        loneliness: z.number().min(0).max(5).optional(),
+        suicideTrends: z.number().min(0).max(5).optional(),
+      })
+      .optional(),
+    therapyHistory: z
+      .object({
+        hasPreviousTherapy: z.boolean().optional(),
+        duration: z.string().optional(),
+        type: z.string().optional(),
+      })
+      .optional(),
+    likertScore: z.number().min(1).max(5).optional(), // For questions 4 & 5
   })
   .catchall(z.unknown())
 
@@ -31,6 +49,25 @@ export const onboardingMoodEntrySchema = z.object({
   photoUrl: z.string().url().optional().nullable(),
   date: z.string().optional(),
   timestamp: z.string().optional(),
+  // New therapeutic data fields
+  symptomRatings: z
+    .object({
+      anxiety: z.number().min(0).max(5).optional(),
+      sadness: z.number().min(0).max(5).optional(),
+      stress: z.number().min(0).max(5).optional(),
+      loneliness: z.number().min(0).max(5).optional(),
+      suicideTrends: z.number().min(0).max(5).optional(),
+    })
+    .optional(),
+  therapyHistory: z
+    .object({
+      hasPreviousTherapy: z.boolean().optional(),
+      duration: z.string().optional(),
+      type: z.string().optional(),
+    })
+    .optional(),
+  therapeuticRelationshipImportance: z.number().min(1).max(5).optional(),
+  patientReadiness: z.number().min(1).max(5).optional(),
 })
 
 export const onboardingSummarySchema = z

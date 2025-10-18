@@ -22,7 +22,21 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     const validatedData = empathyRecommendationSchema.parse(body)
-    const { mood, context, moodScore, emotions, energyLevel, recentMoods, voiceInsights, imageInsights } = validatedData
+    const {
+      mood,
+      context,
+      moodScore,
+      emotions,
+      energyLevel,
+      recentMoods,
+      voiceInsights,
+      imageInsights,
+      symptomRatings,
+      therapyHistory,
+      therapeuticRelationshipImportance,
+      patientReadiness,
+      presentingProblem
+    } = validatedData
 
     const normalizedVoiceMood =
       typeof voiceInsights?.moodLabel === "string" ? voiceInsights.moodLabel.toLowerCase() : undefined
@@ -127,6 +141,12 @@ export async function POST(request: NextRequest) {
       voiceTranscript: voiceInsights?.transcript,
       imageMood: imageInsights?.moodLabel,
       imageConfidence: imageInsights?.confidence,
+      // Pass therapeutic data
+      symptomRatings,
+      therapyHistory,
+      therapeuticRelationshipImportance,
+      patientReadiness,
+      presentingProblem,
     })
 
     return NextResponse.json(recommendations)

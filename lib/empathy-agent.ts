@@ -15,6 +15,22 @@ interface EmpathyInput {
   voiceTranscript?: string
   imageMood?: string
   imageConfidence?: number
+  // Therapeutic questionnaire data
+  symptomRatings?: {
+    anxiety?: number
+    sadness?: number
+    stress?: number
+    loneliness?: number
+    suicideTrends?: number
+  }
+  therapyHistory?: {
+    hasPreviousTherapy?: boolean
+    duration?: string
+    type?: string
+  }
+  therapeuticRelationshipImportance?: number
+  patientReadiness?: number
+  presentingProblem?: string
 }
 
 interface AnalysisSource {
@@ -264,6 +280,16 @@ function calculateConfidence(input: EmpathyInput): number {
   if (input.imageMood) {
     confidence += 5
   }
+  // Boost confidence if therapeutic data is available
+  if (input.symptomRatings && Object.keys(input.symptomRatings).length > 0) {
+    confidence += 8
+  }
+  if (input.presentingProblem) {
+    confidence += 7
+  }
+  if (input.therapyHistory?.hasPreviousTherapy !== undefined) {
+    confidence += 3
+  }
 
   return Math.max(45, Math.min(95, Math.round(confidence)))
 }
@@ -272,7 +298,32 @@ function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, _confiden
   const descriptor = moodDescriptors[mood]
   const parts: string[] = [descriptor]
 
-  if (input.context) {
+  // Add presenting problem if available
+  if (input.presentingProblem) {
+    parts.push(`Chief concern: "${truncate(input.presentingProblem, 100)}".`)
+  }
+
+  // Add symptom ratings if available
+  if (input.symptomRatings) {
+    const symptoms: string[] = []
+    if (input.symptomRatings.anxiety !== undefined && input.symptomRatings.anxiety > 2) {
+      symptoms.push(`anxiety (${input.symptomRatings.anxiety}/5)`)
+    }
+    if (input.symptomRatings.sadness !== undefined && input.symptomRatings.sadness > 2) {
+      symptoms.push(`sadness (${input.symptomRatings.sadness}/5)`)
+    }
+    if (input.symptomRatings.stress !== undefined && input.symptomRatings.stress > 2) {
+      symptoms.push(`stress (${input.symptomRatings.stress}/5)`)
+    }
+    if (input.symptomRatings.loneliness !== undefined && input.symptomRatings.loneliness > 2) {
+      symptoms.push(`loneliness (${input.symptomRatings.loneliness}/5)`)
+    }
+    if (symptoms.length > 0) {
+      parts.push(`Elevated symptoms: ${symptoms.join(", ")}.`)
+    }
+  }
+
+  if (input.context && !input.presentingProblem) {
     parts.push(`Recent note: "${truncate(input.context, 120)}".`)
   }
 
@@ -282,6 +333,16 @@ function buildAnalysisSummary(input: EmpathyInput, mood: MoodCategory, _confiden
 
   if (typeof input.energyLevel === "number") {
     parts.push(`Energy around ${input.energyLevel}/10.`)
+  }
+
+  // Add therapy history context
+  if (input.therapyHistory?.hasPreviousTherapy) {
+    parts.push(`Previous therapy experience noted.`)
+  }
+
+  // Add readiness level
+  if (input.patientReadiness !== undefined && input.patientReadiness >= 4) {
+    parts.push(`High engagement readiness (${input.patientReadiness}/5).`)
   }
 
   return parts.join(" ")

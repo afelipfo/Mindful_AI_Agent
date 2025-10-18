@@ -26,6 +26,26 @@ export const empathyRecommendationSchema = z.object({
       summary: z.string().max(500).optional(),
     })
     .optional(),
+  // Therapeutic questionnaire data
+  symptomRatings: z
+    .object({
+      anxiety: z.number().min(0).max(5).optional(),
+      sadness: z.number().min(0).max(5).optional(),
+      stress: z.number().min(0).max(5).optional(),
+      loneliness: z.number().min(0).max(5).optional(),
+      suicideTrends: z.number().min(0).max(5).optional(),
+    })
+    .optional(),
+  therapyHistory: z
+    .object({
+      hasPreviousTherapy: z.boolean().optional(),
+      duration: z.string().max(200).optional(),
+      type: z.string().max(200).optional(),
+    })
+    .optional(),
+  therapeuticRelationshipImportance: z.number().min(1).max(5).optional(),
+  patientReadiness: z.number().min(1).max(5).optional(),
+  presentingProblem: z.string().max(1000).optional(),
 })
 
 export type EmpathyRecommendationInput = z.infer<typeof empathyRecommendationSchema>
