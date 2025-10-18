@@ -1,6 +1,6 @@
 // Planner Agent - Dynamic tool selection using LangGraph
 import { ChatOpenAI } from "@langchain/openai"
-import { StateGraph, type StateGraphArgs, START, END } from "@langchain/langgraph"
+import { Annotation, StateGraph, START, END } from "@langchain/langgraph"
 import type { AgentState, PlannerResponse } from "./types"
 import {
   loadToolRegistry,
@@ -26,48 +26,19 @@ export async function createPlannerAgent() {
     apiKey: process.env.OPENAI_API_KEY,
   })
 
-  // Define state graph configuration
-  const graphState: StateGraphArgs<AgentState>["channels"] = {
-    sessionId: {
-      value: (left?: string, right?: string) => right ?? left ?? "",
-      default: () => "",
-    },
-    userId: {
-      value: (left?: string, right?: string) => right ?? left ?? "",
-      default: () => "",
-    },
-    messages: {
-      value: (left?: AgentState["messages"], right?: AgentState["messages"]) =>
-        right ?? left ?? [],
-      default: () => [],
-    },
-    context: {
-      value: (left?: Record<string, unknown>, right?: Record<string, unknown>) =>
-        right ?? left ?? {},
-      default: () => ({}),
-    },
-    selectedTools: {
-      value: (left?: string[], right?: string[]) => right ?? left ?? [],
-      default: () => [],
-    },
-    executionTrace: {
-      value: (
-        left?: AgentState["executionTrace"],
-        right?: AgentState["executionTrace"]
-      ) => right ?? left ?? [],
-      default: () => [],
-    },
-    metadata: {
-      value: (left?: Record<string, unknown>, right?: Record<string, unknown>) =>
-        right ?? left ?? {},
-      default: () => ({}),
-    },
-  }
-
-  // Create workflow with proper typing
-  const workflow = new StateGraph<AgentState>({
-    channels: graphState,
+  // Define state using Annotation.Root
+  const PlannerStateAnnotation = Annotation.Root({
+    sessionId: Annotation<string>,
+    userId: Annotation<string>,
+    messages: Annotation<AgentState["messages"]>,
+    context: Annotation<Record<string, unknown>>,
+    selectedTools: Annotation<string[]>,
+    executionTrace: Annotation<AgentState["executionTrace"]>,
+    metadata: Annotation<Record<string, unknown>>,
   })
+
+  // Create workflow
+  const workflow = new StateGraph(PlannerStateAnnotation)
 
   // ============================================================================
   // NODE: Plan - Analyze user intent and select tools
