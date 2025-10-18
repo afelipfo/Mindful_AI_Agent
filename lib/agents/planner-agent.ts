@@ -64,8 +64,10 @@ export async function createPlannerAgent() {
     },
   }
 
-  // Create workflow
-  const workflow = new StateGraph<AgentState>({ channels: graphState })
+  // Create workflow with proper typing
+  const workflow = new StateGraph<AgentState>({
+    channels: graphState,
+  })
 
   // ============================================================================
   // NODE: Plan - Analyze user intent and select tools
@@ -323,14 +325,13 @@ Format your response as natural conversation, not JSON.`
   })
 
   // ============================================================================
-  // Define workflow edges
+  // Define workflow sequence
   // ============================================================================
-  workflow.addEdge("__start__", "plan")
-  workflow.addEdge("plan", "execute")
-  workflow.addEdge("execute", "respond")
-  workflow.addEdge("respond", "__end__")
+  workflow.addEdge("plan", "execute" as any)
+  workflow.addEdge("execute" as any, "respond" as any)
+  workflow.addEdge("respond" as any, "__end__")
 
-  return workflow.compile()
+  return workflow.compile({ entryPoint: "plan" })
 }
 
 // ============================================================================
