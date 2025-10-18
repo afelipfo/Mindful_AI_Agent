@@ -37,8 +37,12 @@ export async function createPlannerAgent() {
     metadata: Annotation<Record<string, unknown>>,
   })
 
-  // Create workflow
-  const workflow = new StateGraph(PlannerStateAnnotation)
+  // Create workflow with explicit node type
+  const workflow = new StateGraph<
+    typeof PlannerStateAnnotation.State,
+    Partial<typeof PlannerStateAnnotation.State>,
+    "plan" | "execute" | "respond"
+  >(PlannerStateAnnotation)
 
   // ============================================================================
   // NODE: Plan - Analyze user intent and select tools
