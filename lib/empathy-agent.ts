@@ -125,7 +125,72 @@ interface FoursquareResponse {
 
 type QuotableRandomResponse = Array<{ content: string; author: string }>
 
-// Detect mood category from emotions and score
+// Detect mood category from therapeutic symptom ratings (NEW - PRIORITY)
+export function detectMoodFromSymptoms(symptomRatings: {
+  anxiety?: number
+  sadness?: number
+  stress?: number
+  loneliness?: number
+  suicideTrends?: number
+}): MoodCategory | null {
+  // Calculate total symptom severity
+  const anxiety = symptomRatings.anxiety || 0
+  const sadness = symptomRatings.sadness || 0
+  const stress = symptomRatings.stress || 0
+  const loneliness = symptomRatings.loneliness || 0
+  const suicideTrends = symptomRatings.suicideTrends || 0
+
+  // If no symptoms reported, return null to use other detection methods
+  if (anxiety === 0 && sadness === 0 && stress === 0 && loneliness === 0 && suicideTrends === 0) {
+    return null
+  }
+
+  // Priority: Determine primary presenting symptom
+  // Anxiety is dominant
+  if (anxiety >= 4 || (anxiety >= 3 && stress >= 3)) {
+    return "anxious"
+  }
+
+  // Sadness/Depression is dominant
+  if (sadness >= 4 || (sadness >= 3 && loneliness >= 3)) {
+    return "sad"
+  }
+
+  // Stress is dominant
+  if (stress >= 4) {
+    return "stressed"
+  }
+
+  // Moderate anxiety (most common)
+  if (anxiety >= 3) {
+    return "anxious"
+  }
+
+  // Moderate sadness
+  if (sadness >= 3) {
+    return "sad"
+  }
+
+  // Moderate stress
+  if (stress >= 3) {
+    return "stressed"
+  }
+
+  // Fatigue/Low energy pattern (loneliness + low other symptoms)
+  if (loneliness >= 2 && anxiety <= 2 && sadness <= 2) {
+    return "tired"
+  }
+
+  // Mixed mild symptoms - default to stressed
+  if (anxiety >= 2 || stress >= 2 || sadness >= 2) {
+    return "stressed"
+  }
+
+  // Very low symptoms - assume neutral/balanced
+  return "tired"
+}
+
+// Detect mood category from emotions and score (FALLBACK)
 export function detectMoodCategory(emotions: string[], moodScore: number): MoodCategory {
   const emotionMap: Record<string, MoodCategory> = {
     worried: "anxious",
