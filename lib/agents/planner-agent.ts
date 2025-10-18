@@ -327,11 +327,11 @@ Format your response as natural conversation, not JSON.`
   // ============================================================================
   // Define workflow sequence
   // ============================================================================
-  workflow.addEdge("plan", "execute" as any)
+  workflow.addEdge("plan" as any, "execute" as any)
   workflow.addEdge("execute" as any, "respond" as any)
   workflow.addEdge("respond" as any, "__end__")
 
-  return workflow.compile({ entryPoint: "plan" })
+  return workflow.compile({ entryPoint: "plan" as any })
 }
 
 // ============================================================================
