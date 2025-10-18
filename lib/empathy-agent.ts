@@ -1093,29 +1093,47 @@ async function getPlaceRecommendation(detectedMood: MoodCategory, latitude?: num
   }
 }
 export async function generateEmpathyRecommendations(input: EmpathyInput): Promise<EmpathyResponse> {
-  const validMood = ensureValidMood(input.detectedMood)
+  // PRIORITY 1: Detect mood from symptom ratings (therapeutic questionnaire)
+  let detectedMood: MoodCategory
+
+  if (input.symptomRatings) {
+    const symptomMood = detectMoodFromSymptoms(input.symptomRatings)
+    if (symptomMood) {
+      console.log("[empathy-agent] Mood detected from symptom ratings:", symptomMood)
+      detectedMood = symptomMood
+    } else {
+      // Fallback to original mood detection
+      detectedMood = ensureValidMood(input.detectedMood)
+      console.log("[empathy-agent] Using fallback mood detection:", detectedMood)
+    }
+  } else {
+    // No symptom data, use original detection
+    detectedMood = ensureValidMood(input.detectedMood)
+    console.log("[empathy-agent] No symptom ratings, using provided mood:", detectedMood)
+  }
+
   const trimmedContext = input.context ? input.context.slice(-600) : undefined
   const normalizedInput: EmpathyInput = {
     ...input,
-    detectedMood: validMood,
+    detectedMood: detectedMood,
     context: trimmedContext,
     emotions: input.emotions,
   }
 
   const confidence = calculateConfidence(normalizedInput)
-  const analysisSummary = buildAnalysisSummary(normalizedInput, validMood, confidence)
+  const analysisSummary = buildAnalysisSummary(normalizedInput, detectedMood, confidence)
   const analysisSources = buildAnalysisSources(normalizedInput)
   const warnings: string[] = []
 
   try {
-    console.log("[v0] Generating empathy recommendations for mood:", validMood)
+    console.log("[v0] Generating empathy recommendations for mood:", detectedMood)
 
     const results = await Promise.allSettled([
       generatePersonalizedEmpathy(normalizedInput, warnings),
-      getMusicRecommendation(validMood, warnings),
-      getBookRecommendation(validMood, warnings),
-      getQuoteRecommendation(validMood, warnings),
-      getPlaceRecommendation(validMood, normalizedInput.latitude, normalizedInput.longitude, warnings),
+      getMusicRecommendation(detectedMood, warnings),
+      getBookRecommendation(detectedMood, warnings),
+      getQuoteRecommendation(detectedMood, warnings),
+      getPlaceRecommendation(detectedMood, normalizedInput.latitude, normalizedInput.longitude, warnings),
     ])
 
     console.log(
@@ -1127,33 +1145,33 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
       results[0].status === "fulfilled" && results[0].value
         ? results[0].value
         : {
-            empathyMessage: empathyResponses[validMood].empathyMessage,
-            recommendation: empathyResponses[validMood].recommendation,
+            empathyMessage: empathyResponses[detectedMood].empathyMessage,
+            recommendation: empathyResponses[detectedMood].recommendation,
           }
 
     const music =
-      results[1].status === "fulfilled" && results[1].value ? results[1].value : empathyResponses[validMood].music
+      results[1].status === "fulfilled" && results[1].value ? results[1].value : empathyResponses[detectedMood].music
 
     const book =
-      results[2].status === "fulfilled" && results[2].value ? results[2].value : empathyResponses[validMood].book
+      results[2].status === "fulfilled" && results[2].value ? results[2].value : empathyResponses[detectedMood].book
 
     const quote =
-      results[3].status === "fulfilled" && results[3].value ? results[3].value : empathyResponses[validMood].quote
+      results[3].status === "fulfilled" && results[3].value ? results[3].value : empathyResponses[detectedMood].quote
 
     const place =
-      results[4].status === "fulfilled" && results[4].value ? results[4].value : empathyResponses[validMood].place
+      results[4].status === "fulfilled" && results[4].value ? results[4].value : empathyResponses[detectedMood].place
 
     const response: EmpathyResponse = {
-      detectedMood: validMood,
+      detectedMood: detectedMood,
       confidence,
       analysisSummary,
       analysisSources,
-      empathyMessage: empathyData.empathyMessage || empathyResponses[validMood].empathyMessage,
-      recommendation: empathyData.recommendation || empathyResponses[validMood].recommendation,
-      quote: quote || empathyResponses[validMood].quote,
-      music: music || empathyResponses[validMood].music,
-      book: book || empathyResponses[validMood].book,
-      place: place || empathyResponses[validMood].place,
+      empathyMessage: empathyData.empathyMessage || empathyResponses[detectedMood].empathyMessage,
+      recommendation: empathyData.recommendation || empathyResponses[detectedMood].recommendation,
+      quote: quote || empathyResponses[detectedMood].quote,
+      music: music || empathyResponses[detectedMood].music,
+      book: book || empathyResponses[detectedMood].book,
+      place: place || empathyResponses[detectedMood].place,
       warnings: warnings.length ? warnings : undefined,
     }
 
@@ -1163,11 +1181,11 @@ export async function generateEmpathyRecommendations(input: EmpathyInput): Promi
     console.error("[v0] Error generating empathy recommendations:", error)
     warnings.push("Displayed saved recommendations because live services were unavailable.")
     return {
-      detectedMood: validMood,
+      detectedMood: detectedMood,
       confidence,
       analysisSummary,
       analysisSources,
-      ...empathyResponses[validMood],
+      ...empathyResponses[detectedMood],
       warnings,
     }
   }
