@@ -397,39 +397,39 @@ function buildAnalysisSources(input: EmpathyInput): AnalysisSource[] {
   return normalizeSources(sources)
 }
 
-// Pre-cached responses for each mood category
+// Pre-cached therapeutic responses for each mood category (fallback)
 const empathyResponses: Record<MoodCategory, RecommendationSet> = {
   anxious: {
     empathyMessage:
-      "It's completely normal to feel anxious. Your feelings are valid, and you're taking the right step by acknowledging them. Remember, anxiety is your mind trying to protect you.",
+      "I understand you're experiencing anxiety. This is a common response to stress and uncertainty, and it's important that you're seeking support. Your willingness to engage with these feelings is a positive step toward managing them.",
     recommendation: {
-      title: "4-7-8 Breathing",
+      title: "Diaphragmatic Breathing (Evidence-Based Anxiety Reduction)",
       description:
-        "Try the 4-7-8 breathing technique: Inhale for 4 seconds, hold for 7, exhale for 8. Repeat 3 times. This activates your parasympathetic nervous system.",
-      actionLabel: "Start breathing exercise",
+        "Practice diaphragmatic breathing: Inhale slowly for 4 counts, hold for 7, exhale for 8. Repeat for 5 minutes. This technique activates the parasympathetic nervous system and has been shown to reduce anxiety symptoms in clinical trials.",
+      actionLabel: "Begin breathing exercise",
       actionType: "breathing",
     },
     quote: {
-      text: "You are braver than you believe, stronger than you seem, and smarter than you think.",
-      author: "A.A. Milne",
+      text: "Between stimulus and response there is a space. In that space is our power to choose our response.",
+      author: "Viktor E. Frankl",
     },
     music: {
       title: "Weightless",
       artist: "Marconi Union",
-      reason: "Scientifically proven to reduce anxiety by 65% through carefully arranged harmonies and rhythms.",
+      reason: "Clinical studies show this composition can reduce anxiety levels through carefully designed harmonies and rhythmic patterns.",
       spotifyUrl: "https://open.spotify.com/search/Weightless%20Marconi%20Union",
       appleMusicUrl: "https://music.apple.com/search?term=Weightless%20Marconi%20Union",
     },
     book: {
       title: "The Anxiety and Phobia Workbook",
-      author: "Edmund Bourne",
-      relevance: "Practical CBT techniques and exercises to manage anxiety in daily life.",
+      author: "Edmund J. Bourne, PhD",
+      relevance: "Evidence-based CBT and mindfulness techniques for managing anxiety disorders, widely used in clinical practice.",
       amazonUrl: "https://www.amazon.com/s?k=The+Anxiety+and+Phobia+Workbook",
     },
     place: {
-      type: "A botanical garden",
-      reason: "Nature exposure reduces cortisol by 21%",
-      benefits: "Surrounded by greenery, gentle sounds, and fresh air to calm your nervous system.",
+      type: "A quiet natural space (park or botanical garden)",
+      reason: "Nature-based therapy (ecotherapy) has demonstrated efficacy in reducing cortisol and anxiety symptoms",
+      benefits: "Natural environments support nervous system regulation and provide a grounding sensory experience.",
     },
   },
   happy: {
@@ -467,35 +467,35 @@ const empathyResponses: Record<MoodCategory, RecommendationSet> = {
   },
   sad: {
     empathyMessage:
-      "Sadness is a natural part of being human. Remember that it's okay not to be okay, and this feeling won't last forever. You're not alone in this.",
+      "I hear that you're experiencing sadness. This is a valid emotional response, and it's important to acknowledge these feelings rather than suppress them. Your engagement in this process demonstrates self-awareness and a willingness to work through difficult emotions.",
     recommendation: {
-      title: "Reach Out",
+      title: "Behavioral Activation (Depression Treatment)",
       description:
-        "Connect with someone you trust. Sometimes sharing how we feel can lighten the emotional load. Even a brief conversation can help.",
-      actionLabel: "View contacts",
+        "Engage in one small, meaningful activity despite low motivation. Behavioral activation is an evidence-based treatment for depression that helps break the cycle of withdrawal and sadness. Even a brief social contact or pleasant activity can begin to shift mood.",
+      actionLabel: "View suggested activities",
       actionType: "contact",
     },
     quote: {
-      text: "The wound is the place where the light enters you.",
-      author: "Rumi",
+      text: "The only way out is through.",
+      author: "Robert Frost",
     },
     music: {
       title: "The Night We Met",
       artist: "Lord Huron",
-      reason: "Validates melancholy feelings and provides cathartic emotional release.",
+      reason: "Music therapy research suggests that validating emotional experiences through music can provide cathartic release.",
       spotifyUrl: "https://open.spotify.com/search/The%20Night%20We%20Met%20Lord%20Huron",
       appleMusicUrl: "https://music.apple.com/search?term=The%20Night%20We%20Met%20Lord%20Huron",
     },
     book: {
-      title: "When Things Fall Apart",
-      author: "Pema Chödrön",
-      relevance: "Buddhist perspective on embracing pain and finding peace in difficult times.",
-      amazonUrl: "https://www.amazon.com/s?k=When+Things+Fall+Apart",
+      title: "Feeling Good: The New Mood Therapy",
+      author: "David D. Burns, MD",
+      relevance: "Evidence-based cognitive behavioral techniques for managing depression, based on clinical research.",
+      amazonUrl: "https://www.amazon.com/s?k=Feeling+Good+David+Burns",
     },
     place: {
-      type: "A cozy café with natural light",
-      reason: "Gentle social exposure in a warm atmosphere",
-      benefits: "Soft ambient sounds, warm lighting, and the presence of others without pressure to interact.",
+      type: "A well-lit communal space (café or library)",
+      reason: "Gentle social exposure combats isolation, a key maintaining factor in depression",
+      benefits: "Low-pressure social environment that provides structure and human connection without demanding interaction.",
     },
   },
   tired: {
@@ -533,35 +533,35 @@ const empathyResponses: Record<MoodCategory, RecommendationSet> = {
   },
   stressed: {
     empathyMessage:
-      "Stress is your body's response to demands, and it shows you care deeply. Acknowledging it is the first step to managing it effectively.",
+      "You're experiencing stress, which indicates your system is responding to perceived demands or threats. Recognizing this physiological response is an important first step toward implementing effective stress management strategies.",
     recommendation: {
-      title: "Progressive Muscle Relaxation",
+      title: "Progressive Muscle Relaxation (PMR)",
       description:
-        "Tense and release each muscle group for 5 seconds, starting from your toes to your head. This releases physical tension stored in your body.",
-      actionLabel: "Start relaxation",
+        "Practice PMR: Systematically tense and release each muscle group for 5-7 seconds, progressing from feet to head. This evidence-based technique reduces physiological arousal and has been shown effective in stress reduction across clinical populations.",
+      actionLabel: "Begin PMR exercise",
       actionType: "breathing",
     },
     quote: {
-      text: "You can't calm the storm, so stop trying. What you can do is calm yourself. The storm will pass.",
-      author: "Timber Hawkeye",
+      text: "Between stimulus and response there is a space. In that space is our power to choose our response.",
+      author: "Viktor E. Frankl",
     },
     music: {
       title: "Breathe Me",
       artist: "Sia",
-      reason: "Grounding melody that facilitates emotional release and self-compassion.",
+      reason: "Emotionally resonant music can facilitate emotional processing and self-compassion.",
       spotifyUrl: "https://open.spotify.com/search/Breathe%20Me%20Sia",
       appleMusicUrl: "https://music.apple.com/search?term=Breathe%20Me%20Sia",
     },
     book: {
-      title: "The Subtle Art of Not Giving a F*ck",
-      author: "Mark Manson",
-      relevance: "Perspective shift on what truly matters and letting go of unnecessary stress.",
-      amazonUrl: "https://www.amazon.com/s?k=The+Subtle+Art+of+Not+Giving+a+Fck",
+      title: "The Relaxation and Stress Reduction Workbook",
+      author: "Martha Davis, PhD",
+      relevance: "Comprehensive evidence-based techniques for stress management, widely used in clinical practice.",
+      amazonUrl: "https://www.amazon.com/s?k=Relaxation+Stress+Reduction+Workbook",
     },
     place: {
-      type: "A nearby body of water",
-      reason: "Blue spaces calm the nervous system",
-      benefits: "The sound and sight of water triggers relaxation response and reduces cortisol.",
+      type: "A natural water setting (lake, ocean, or stream)",
+      reason: "Blue space exposure has been shown to reduce physiological markers of stress including cortisol",
+      benefits: "Rhythmic water sounds and visual patterns promote parasympathetic nervous system activation.",
     },
   },
   excited: {
@@ -618,18 +618,58 @@ async function generatePersonalizedEmpathy(
       throw new Error("OpenAI API key not configured")
     }
 
-    const systemPrompt = `You are an empathetic mental wellness companion. Generate a warm validation message (2-3 sentences) and one practical recommendation with time estimate based on the user's mood. Use 'you' pronouns. Never minimize feelings or give clinical advice. Return ONLY valid JSON with this structure:
+    const systemPrompt = `You are a professional mental health AI assistant helping therapists provide initial assessments and recommendations. Generate a compassionate, professional response message (2-3 sentences) and one evidence-based therapeutic recommendation based on the client's presenting concerns and symptom profile. Use 'you' pronouns. Focus on validation, psychoeducation, and therapeutic interventions. Never provide crisis intervention advice - recommend professional help for severe symptoms. Return ONLY valid JSON with this structure:
 {
   "empathyMessage": "string",
   "recommendation": {
     "title": "string",
-    "description": "string (include time estimate)",
+    "description": "string (therapeutic intervention with clinical rationale)",
     "actionLabel": "string (call to action)",
     "actionType": "breathing" | "journal" | "timer" | "contact"
   }
 }`
 
-    const userPrompt = `Mood: ${input.detectedMood}, Score: ${input.moodScore}/10, Energy: ${input.energyLevel}/10${input.context ? `, Context: "${input.context}"` : ""}`
+    // Build comprehensive therapeutic context
+    let userPrompt = `Client Profile:
+- Presenting Problem: ${input.presentingProblem || "Not specified"}
+- Current Mood: ${input.detectedMood}, Score: ${input.moodScore}/10, Energy: ${input.energyLevel}/10`
+
+    // Add symptom ratings if available
+    if (input.symptomRatings) {
+      const symptoms = []
+      if (input.symptomRatings.anxiety !== undefined) symptoms.push(`Anxiety: ${input.symptomRatings.anxiety}/5`)
+      if (input.symptomRatings.sadness !== undefined) symptoms.push(`Sadness: ${input.symptomRatings.sadness}/5`)
+      if (input.symptomRatings.stress !== undefined) symptoms.push(`Stress: ${input.symptomRatings.stress}/5`)
+      if (input.symptomRatings.loneliness !== undefined) symptoms.push(`Loneliness: ${input.symptomRatings.loneliness}/5`)
+      if (input.symptomRatings.suicideTrends !== undefined && input.symptomRatings.suicideTrends > 0)
+        symptoms.push(`Suicidal Ideation: ${input.symptomRatings.suicideTrends}/5 - ALERT`)
+
+      if (symptoms.length > 0) {
+        userPrompt += `\n- Symptom Severity (past 2 weeks): ${symptoms.join(", ")}`
+      }
+    }
+
+    // Add therapy history
+    if (input.therapyHistory) {
+      if (input.therapyHistory.hasPreviousTherapy) {
+        userPrompt += `\n- Previous Therapy: Yes (${input.therapyHistory.duration || "duration unspecified"}, ${input.therapyHistory.type || "type unspecified"})`
+      } else {
+        userPrompt += `\n- Previous Therapy: No`
+      }
+    }
+
+    // Add readiness and relationship importance
+    if (input.patientReadiness !== undefined) {
+      userPrompt += `\n- Treatment Readiness: ${input.patientReadiness}/5`
+    }
+    if (input.therapeuticRelationshipImportance !== undefined) {
+      userPrompt += `\n- Therapeutic Alliance Importance: ${input.therapeuticRelationshipImportance}/5`
+    }
+
+    // Add context notes
+    if (input.context) {
+      userPrompt += `\n- Additional Context: "${input.context}"`
+    }
 
     const response = await retryFetch(
       "https://api.openai.com/v1/chat/completions",

@@ -529,31 +529,43 @@ export default function OnboardingPage() {
 
     // Step 2: Current Symptoms - Parse symptom ratings
     const symptomsResponse = responsesByStep[1] // Index 1 = Step 2
-    if (symptomsResponse?.content) {
-      const content = symptomsResponse.content.toLowerCase()
-      const symptomRatings: {
-        anxiety?: number
-        sadness?: number
-        stress?: number
-        loneliness?: number
-        suicideTrends?: number
-      } = {}
+    if (symptomsResponse) {
+      // First check if metadata has structured symptom ratings
+      if (symptomsResponse.metadata?.symptomRatings) {
+        therapeuticData.symptomRatings = symptomsResponse.metadata.symptomRatings as {
+          anxiety?: number
+          sadness?: number
+          stress?: number
+          loneliness?: number
+          suicideTrends?: number
+        }
+      } else if (symptomsResponse.content) {
+        // Fallback to parsing from text
+        const content = symptomsResponse.content.toLowerCase()
+        const symptomRatings: {
+          anxiety?: number
+          sadness?: number
+          stress?: number
+          loneliness?: number
+          suicideTrends?: number
+        } = {}
 
-      // Try to extract numeric ratings from text
-      const anxietyMatch = content.match(/anxiety[:\s]+(\d)/)
-      const sadnessMatch = content.match(/sadness[:\s]+(\d)/)
-      const stressMatch = content.match(/stress[:\s]+(\d)/)
-      const lonelinessMatch = content.match(/loneliness[:\s]+(\d)/)
-      const suicideMatch = content.match(/suicide[:\s]+(\d)/)
+        // Try to extract numeric ratings from text
+        const anxietyMatch = content.match(/anxiety[:\s]+(\d)/)
+        const sadnessMatch = content.match(/sadness[:\s]+(\d)/)
+        const stressMatch = content.match(/stress[:\s]+(\d)/)
+        const lonelinessMatch = content.match(/loneliness[:\s]+(\d)/)
+        const suicideMatch = content.match(/suicide[:\s]+(\d)/)
 
-      if (anxietyMatch) symptomRatings.anxiety = clamp(parseInt(anxietyMatch[1], 10), 0, 5)
-      if (sadnessMatch) symptomRatings.sadness = clamp(parseInt(sadnessMatch[1], 10), 0, 5)
-      if (stressMatch) symptomRatings.stress = clamp(parseInt(stressMatch[1], 10), 0, 5)
-      if (lonelinessMatch) symptomRatings.loneliness = clamp(parseInt(lonelinessMatch[1], 10), 0, 5)
-      if (suicideMatch) symptomRatings.suicideTrends = clamp(parseInt(suicideMatch[1], 10), 0, 5)
+        if (anxietyMatch) symptomRatings.anxiety = clamp(parseInt(anxietyMatch[1], 10), 0, 5)
+        if (sadnessMatch) symptomRatings.sadness = clamp(parseInt(sadnessMatch[1], 10), 0, 5)
+        if (stressMatch) symptomRatings.stress = clamp(parseInt(stressMatch[1], 10), 0, 5)
+        if (lonelinessMatch) symptomRatings.loneliness = clamp(parseInt(lonelinessMatch[1], 10), 0, 5)
+        if (suicideMatch) symptomRatings.suicideTrends = clamp(parseInt(suicideMatch[1], 10), 0, 5)
 
-      if (Object.keys(symptomRatings).length > 0) {
-        therapeuticData.symptomRatings = symptomRatings
+        if (Object.keys(symptomRatings).length > 0) {
+          therapeuticData.symptomRatings = symptomRatings
+        }
       }
     }
 
@@ -929,6 +941,8 @@ export default function OnboardingPage() {
               }
               placeholder={currentQuestion?.placeholder || "Type your response..."}
               isLoading={isProcessing}
+              currentStep={currentStepIndex}
+              showSymptomRating={currentStepIndex === 1 && flowState === "collecting"}
             />
           )}
         </div>

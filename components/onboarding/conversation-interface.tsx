@@ -10,12 +10,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import type { ConversationMessage, MessageMetadata, MessageType } from "@/types/conversation"
+import { SymptomRatingInput } from "./symptom-rating-input"
 
 interface ConversationInterfaceProps {
   messages: ConversationMessage[]
   onSendMessage: (message: string, type?: MessageType, metadata?: MessageMetadata) => void
   placeholder?: string
   isLoading?: boolean
+  currentStep?: number // Current question step (0-indexed)
+  showSymptomRating?: boolean // Whether to show symptom rating input
 }
 
 export function ConversationInterface({
@@ -23,10 +26,28 @@ export function ConversationInterface({
   onSendMessage,
   placeholder = "Type your response...",
   isLoading = false,
+  currentStep = 0,
+  showSymptomRating = false,
 }: ConversationInterfaceProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleSymptomRatingSubmit = (ratings: {
+    anxiety: number
+    sadness: number
+    stress: number
+    loneliness: number
+    suicideTrends: number
+  }) => {
+    // Format the response as text for display
+    const responseText = `Anxiety: ${ratings.anxiety}, Sadness: ${ratings.sadness}, Stress: ${ratings.stress}, Loneliness: ${ratings.loneliness}, Suicide trends: ${ratings.suicideTrends}`
+
+    // Send with metadata containing the structured ratings
+    onSendMessage(responseText, "text", {
+      symptomRatings: ratings,
+    })
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -146,21 +167,25 @@ export function ConversationInterface({
       </div>
 
       <div className="sticky bottom-0 border-t border-border bg-background p-6">
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleTextareaChange}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className="min-h-[56px] max-h-[200px] resize-none"
-            disabled={isLoading}
-          />
-          <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0" disabled={!input.trim() || isLoading}>
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send message</span>
-          </Button>
-        </form>
+        {showSymptomRating && currentStep === 1 ? (
+          <SymptomRatingInput onSubmit={handleSymptomRatingSubmit} isLoading={isLoading} />
+        ) : (
+          <form onSubmit={handleSubmit} className="flex items-end gap-3">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleTextareaChange}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              className="min-h-[56px] max-h-[200px] resize-none"
+              disabled={isLoading}
+            />
+            <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0" disabled={!input.trim() || isLoading}>
+              <Send className="h-4 w-4" />
+              <span className="sr-only">Send message</span>
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   )
